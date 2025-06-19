@@ -1,0 +1,298 @@
+name: Build/Publish Docker Images and, optionally, Singularity Images on CVMFS
+
+inputs:
+  image:
+    description: |
+      the full-qualified image (tagless) --
+        include a registry if not storing with dockerhub
+        ex: 'ghcr.io/foo/bar', 'foo/bar', etc.
+    required: true
+  action:
+    description: |
+      what action to perform
+        BUILD                   - build and publish 'inputs.image'
+        CVMFS_BUILD             - BUILD, then request CVMFS to build and persist 'inputs.image'
+        CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
+        CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
+    required: true
+  # OPTIONAL: Docker Hub
+  dockerhub_username:
+    description: |
+      IF USING DOCKER HUB (else, var is ignored):
+        the dockerhub username needed for publishing the image
+      HINT: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
+    default: ""
+    required: false
+  dockerhub_token:
+    description: |
+      IF USING DOCKER HUB (else, var is ignored):
+        the dockerhub token (password) needed for publishing the image
+      HINT: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
+    default: ""
+    required: false
+  # OPTIONAL: ghcr.io
+  ghcr_token:
+    description: |
+      IF USING ghcr.io (else, var is ignored):
+        a GitHub token for authenticating with ghcr.io when pushing Docker images
+      HINT: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
+    default: ""
+    required: true
+  # OPTIONAL: CVMFS
+  gh_cvmfs_token:
+    description: |
+      IF USING CVMFS (else, var is ignored):
+      a PAT so the action can git push to GitHub (used for CVMFS build/removal requests)
+    default: ""
+    required: true
+  cvmfs_dest_dir:
+    description: |
+      IF USING CVMFS (else, var is ignored):
+        the CVMFS directory to place the singularity image built from the docker image
+    default: ""
+    required: false
+  cvmfs_remove_tags:
+    description: |
+      IF REMOVING ON CVMFS (else, var is ignored):
+        the image **TAGS** (i.e. 'bar' in 'baz/foo:bar') to remove on CVMFS -- newline-delimited
+        tags can be a pattern-based or verbatim -- see https://github.com/WIPACrepo/build-singularity-cvmfs-action
+      Ex: '$ {{ github.ref_name }}-[SHA]' (no space after $)
+    default: ""
+    required: false
+  # OPTIONAL: misc build config
+  free_disk_space:
+    description: |
+      IF BUILDING VERY LARGE IMAGES (else, var is ignored):
+        whether to free disk space on the GitHub runner before building the image
+    default: false
+    type: boolean
+    required: false
+  build_platform:
+    description: |
+      IF BUILDING IMAGE (else, var is ignored):
+        what CPU architecture platform to use when building the image
+      Ex: '$ {{ github.event.inputs.platform || env.DEFAULT_PLATFORM }}' (no space after $)
+    default: "linux/amd64"
+    required: false
+
+
+runs:
+  using: "composite"
+
+  steps:
+
+    - name: Action determination logic (set defaults)
+      if: always()
+      run: |
+        # step: Action determination logic (set defaults)
+        set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+        echo "DO_1_CVMFS_REMOVE=false" >> "$GITHUB_ENV"
+        echo "DO_2_BUILD=false" >> "$GITHUB_ENV"
+        echo "DO_3_CVMFS_BUILD=false" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Action determination logic - DO_1_CVMFS_REMOVE
+      if: |
+        inputs.action == 'CVMFS_REMOVE' || 
+        inputs.action == 'CVMFS_REMOVE_THEN_BUILD'
+      run: echo "DO_1_CVMFS_REMOVE=true" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Action determination logic - DO_2_BUILD
+      if: |
+        inputs.action == 'BUILD' || 
+        inputs.action == 'CVMFS_BUILD' || 
+        inputs.action == 'CVMFS_REMOVE_THEN_BUILD'
+      run: echo "DO_2_BUILD=true" >> "$GITHUB_ENV"
+      shell: bash
+
+    - name: Action determination logic - DO_3_CVMFS_BUILD
+      if: |
+        inputs.action == 'CVMFS_BUILD' || 
+        inputs.action == 'CVMFS_REMOVE_THEN_BUILD'
+      run: echo "DO_3_CVMFS_BUILD=true" >> "$GITHUB_ENV"
+      shell: bash
+
+
+    ####################################################################################
+    # Prep before action logic
+    ####################################################################################
+
+    - name: Validate and Prep Image Tag Variables
+      if: always()
+      run: |
+        # step: Validate and Prep Image Tag Variables
+        set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+        
+        # validate slash-format
+        if [[ ! "${{ inputs.image }}" =~ ^[^/]+/[^/]+(/[^/]+)?$ ]]; then
+            echo "::error::'inputs.image' (${{ inputs.image }}) must be in the form 'NAMESPACE/IMAGE' or 'REGISTRY/NAMESPACE/IMAGE'"
+            exit 1
+        fi
+        
+        # validate there's no tag or digest attached
+        last_segment=$(basename "${{ inputs.image }}")
+        if [[ "$last_segment" == *:* || "$last_segment" == *@* ]]; then
+            echo "::error::'inputs.image' (${{ inputs.image }}) must not include a tag or digest"
+            exit 1
+        else
+            echo "IMAGE_NAME=$last_segment" >> "$GITHUB_ENV"
+        fi
+      shell: bash
+
+    - name: Validate required CVMFS input(s)
+      if: env.DO_1_CVMFS_REMOVE == 'true' || env.DO_3_CVMFS_BUILD == 'true'
+      run: |
+        # step: Validate required CVMFS input(s)
+        set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+        if [[ -z "${{ inputs.cvmfs_dest_dir }}" ]]; then
+          echo "::error::'inputs.cvmfs_dest_dir' must be provided when removing or building images on CVMFS"
+          exit 1
+        fi
+      shell: bash
+
+    - name: Summary (appears in GitHub UI)
+      if: always()
+      run: |
+        # step: Summary (appears in GitHub UI)
+        set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+        {
+          echo "# 🚀 `WIPACrepo/wipac-dev-publish-image-action` Plan"
+          echo ""
+          echo "### 🔧 Inputs"
+          echo "- \`image\` = ${{ inputs.image }}"
+          echo "- \`action\` = ${{ inputs.action }}"
+          echo "- if applicable: \`platform\` = ${{ inputs.build_platform }}"
+          echo "- if applicable: \`free_disk_space\` = ${{ inputs.free_disk_space }}"
+          echo "- if applicable: \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir }}"
+          echo "- if applicable: \`cvmfs_remove_tags\` = ${{ inputs.cvmfs_remove_tags }}"
+          echo ""
+          echo "### 📋 Interpreted Configuration"
+          echo "- \`image_name\` = ${{ env.IMAGE_NAME }}"
+          echo ""
+          echo "### ⏭️ Planned Steps"
+          [[ "${{ env.DO_1_CVMFS_REMOVE }}" == 'true' ]] && echo "- Will request CVMFS image removal"
+          [[ "${{ env.DO_2_BUILD }}" == 'true' ]] && echo "- Will build & publish Docker image on registry" || echo "- Will skip Docker build"
+          [[ "${{ env.DO_3_CVMFS_BUILD }}" == 'true' ]] && echo "- Will request CVMFS Singularity image build"
+          echo ""
+          echo "_Summary generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
+        } >> "$GITHUB_STEP_SUMMARY"
+      shell: bash
+
+
+    ####################################################################################
+    # 1: Do Remove CVMFS
+    ####################################################################################
+
+    - if: env.DO_1_CVMFS_REMOVE == 'true'
+      id: gen_cvmfs_nametags
+      name: Generate CVMFS image nametags to remove
+      env:
+        TAGS: ${{ inputs.cvmfs_remove_tags }}
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+      run: |
+        # step: Generate CVMFS image nametags to remove  # fmt:ok
+        set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+        if [[ -z "$TAGS" ]]; then
+            echo "::error::'inputs.cvmfs_remove_tags' must be given in order to remove CVMFS images"
+            exit 1
+        fi
+
+        python -c '
+        import os
+        image_name = os.environ["IMAGE_NAME"]
+        tags = os.environ["TAGS"]
+        print("\n".join(f"{image_name}:{t.strip()}" for t in tags.splitlines() if t.strip()))
+        ' > delete_image_nametags.txt
+
+        {
+          echo "delete_image_nametags<<EOF"
+          cat delete_image_nametags.txt
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+      shell: bash
+
+
+    - if: env.DO_1_CVMFS_REMOVE == 'true'
+      name: Request Removing Image(s) from CVMFS
+      uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
+      with:
+        github_token: ${{ inputs.gh_cvmfs_token }}  # so job can git push
+        dest_dir: ${{ inputs.cvmfs_dest_dir }}  # Required for constructing path pattern
+        delete_image_nametags: ${{ steps.gen_cvmfs_nametags.outputs.delete_image_nametags }}
+
+
+    ####################################################################################
+    # 2: Do Build + Publish Docker Image
+    ####################################################################################
+
+    - if: env.DO_2_BUILD == 'true' && inputs.free_disk_space == 'true'
+      uses: jlumbroso/free-disk-space@main  # clears space for image build
+      with:
+        docker-images: false  # keep docker otherwise build will re-download them
+
+    - if: env.DO_2_BUILD == 'true'
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+
+    - if: env.DO_2_BUILD == 'true'
+      id: docker_meta
+      uses: docker/metadata-action@v4
+      with:
+        images: |
+          ${{ inputs.image }}
+        tags: |
+          # running on: branch
+          type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
+          # running on: new tag
+          type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
+          type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
+          type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+
+    - if: env.DO_2_BUILD == 'true' && ! startsWith(inputs.image, 'ghcr.io/')
+      name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ inputs.dockerhub_username }}
+        password: ${{ inputs.dockerhub_token }}
+
+    - if: env.DO_2_BUILD == 'true' && startsWith(inputs.image, 'ghcr.io/')
+      name: Login to GitHub Container Registry
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.ghcr_token }}
+
+    - if: env.DO_2_BUILD == 'true' && contains(inputs.build_platform, 'arm')
+      name: Setup QEMU (if platform requires it)
+      uses: docker/setup-qemu-action@v2
+
+    - if: env.DO_2_BUILD == 'true'
+      uses: docker/setup-buildx-action@v2
+
+    - if: env.DO_2_BUILD == 'true'
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        platforms: ${{ inputs.build_platform }}
+        push: true
+        tags: ${{ steps.docker_meta.outputs.tags }}
+        labels: ${{ steps.docker_meta.outputs.labels }}
+
+
+    ####################################################################################
+    # 3: Do Build Singularity Image on CVMFS
+    ####################################################################################
+
+    - if: env.DO_3_CVMFS_BUILD == 'true'
+      name: Request Building Singularity Image(s) on CVMFS
+      uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
+      with:
+        github_token: ${{ inputs.gh_cvmfs_token }}  # so job can git push
+        dest_dir: ${{ inputs.cvmfs_dest_dir }}  # Required for constructing path pattern
+        build_images: ${{ steps.docker_meta.outputs.tags }}
