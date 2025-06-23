@@ -8,7 +8,7 @@ on:
         description: |
           The full-qualified image (tagless) --
             include a registry if not storing with dockerhub
-            ex: 'ghcr.io/foo/bar', 'foo/bar', etc.
+          EXAMPLE: 'ghcr.io/foo/bar', 'foo/bar', etc.
         required: true
       mode:
         description: |
@@ -47,7 +47,7 @@ on:
           IF REMOVING ON CVMFS (else, var is ignored):
             The image **TAGS** (i.e. 'bar' in 'baz/foo:bar') to remove on CVMFS -- newline-delimited
             tags can be a pattern-based or verbatim -- see https://github.com/WIPACrepo/build-singularity-cvmfs-action
-          Ex: '$ {{ github.ref_name }}-[SHA]' (no space after $)
+          EXAMPLE: '$ {{ github.ref_name }}-[SHA]' (no space after $)
         required: false
       free_disk_space:
         description: |
@@ -59,7 +59,7 @@ on:
         description: |
           IF BUILDING IMAGE (else, var is ignored):
             The CPU architecture platform to use when building the image
-          Ex: '$ {{ github.event.inputs.platform || env.DEFAULT_PLATFORM }}' (no space after $)
+          EXAMPLE: '$ {{ github.event.inputs.platform || env.DEFAULT_PLATFORM }}' (no space after $)
         required: false
         default: "linux/amd64"
 
