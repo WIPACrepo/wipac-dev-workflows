@@ -63,7 +63,7 @@ on:
           IF BUILDING IMAGE (else, var is ignored):
             Comma-delimited list of CPU architecture platforms to build (e.g. linux/amd64,linux/arm64)
         required: false
-        default: "linux/amd64, linux/arm64"
+        default: "linux/amd64,linux/arm64"
 
 
 jobs:
