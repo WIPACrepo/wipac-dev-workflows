@@ -28,16 +28,16 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 
 #### If using DockerHub
 
-| Name                 | Required                      | Description         |
-|----------------------|-------------------------------|---------------------|
-| `dockerhub_username` | ✅, if building for Docker Hub | Docker Hub username |
-| `dockerhub_token`    | ✅, if building for Docker Hub | Docker Hub token    |
+| Name                | Required                      | Description         |
+|---------------------|-------------------------------|---------------------|
+| `registry_username` | ✅, if building for Docker Hub | Docker Hub username |
+| `registry_token`    | ✅, if building for Docker Hub | Docker Hub token    |
 
 #### If using the GitHub Container Registry (ghcr.io)
 
-| Name         | Required                     | Description                                    |
-|--------------|------------------------------|------------------------------------------------|
-| `ghcr_token` | ✅, if building for `ghcr.io` | GitHub token for authenticating with `ghcr.io` |
+| Name             | Required                     | Description                                    |
+|------------------|------------------------------|------------------------------------------------|
+| `registry_token` | ✅, if building for `ghcr.io` | GitHub token for authenticating with `ghcr.io` |
 
 #### If interacting with CVMFS
 
@@ -71,8 +71,8 @@ jobs:
     with:
       image: myorg/myimage
       mode: BUILD
-      dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+      registry_username: ${{ secrets.DOCKERHUB_USERNAME }}
+      registry_token: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
 
 Build for ghcr.io + CVMFS:
@@ -84,7 +84,7 @@ jobs:
     with:
       image: ghcr.io/myrepo/myimage
       mode: CVMFS_BUILD
-      ghcr_token: ${{ secrets.GITHUB_TOKEN }}
+      registry_token: ${{ secrets.GITHUB_TOKEN }}
       gh_cvmfs_token: ${{ secrets.CVMFS_PAT }}
       cvmfs_dest_dir: myorg
 ```
@@ -117,7 +117,7 @@ jobs:
     with:
       image: ghcr.io/myrepo/myimage
       mode: ${{ needs.determine-mode.outputs.mode }}
-      ghcr_token: ${{ secrets.GITHUB_TOKEN }}
+      registry_token: ${{ secrets.GITHUB_TOKEN }}
       gh_cvmfs_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       cvmfs_dest_dir: myorg/myrepo
       cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'

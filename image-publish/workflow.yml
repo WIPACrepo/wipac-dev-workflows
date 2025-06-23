@@ -18,23 +18,19 @@ on:
             CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
             CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
         required: true
-      dockerhub_username:
+      registry_username:
         description: |
-          IF USING DOCKER HUB (else, var is ignored):
-            The dockerhub username needed for publishing the image
-          HINT: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
+          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
+            The username needed for publishing the image to a container registry -- 
+            if your registry does not need a username, use `registry_token`. 
+          EXAMPLE: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
         required: false
-      dockerhub_token:
+      registry_token:
         description: |
-          IF USING DOCKER HUB (else, var is ignored):
-            The dockerhub token (password) needed for publishing the image
-          HINT: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
-        required: false
-      ghcr_token:
-        description: |
-          IF USING ghcr.io (else, var is ignored):
-            A GitHub token for authenticating with ghcr.io when pushing Docker images
-          HINT: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
+          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
+            The token/password needed for publishing the image to a container registry.
+          EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
+          EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
         required: false
       gh_cvmfs_token:
         description: |
@@ -165,20 +161,20 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
 
-      - name: Docker login (DockerHub)
+      - name: Container registry log-in (Docker Hub)
         if: env.DO_2_BUILD == 'true' && ! startsWith(inputs.image, 'ghcr.io/')
         uses: docker/login-action@v2
         with:
-          username: ${{ inputs.dockerhub_username }}
-          password: ${{ inputs.dockerhub_token }}
+          username: ${{ inputs.registry_username }}
+          password: ${{ inputs.registry_token }}
 
-      - name: Docker login (GHCR)
+      - name: Container registry log-in (GHCR)
         if: env.DO_2_BUILD == 'true' && startsWith(inputs.image, 'ghcr.io/')
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ inputs.ghcr_token }}
+          password: ${{ inputs.registry_token }}
 
       - name: Setup QEMU
         if: env.DO_2_BUILD == 'true' && contains(inputs.build_platform, 'arm')
