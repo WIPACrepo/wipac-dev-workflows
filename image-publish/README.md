@@ -1,6 +1,6 @@
-# WIPACRepo/wipac-dev-workflows/image-publish/workflow.yml
+# WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml
 
-This GitHub Action builds and pushes Docker images to Docker Hub or GitHub Container Registry (GHCR), and optionally requests Singularity image builds or removals on CVMFS.
+This GitHub Actions workflow builds and pushes Docker images to Docker Hub or GitHub Container Registry (GHCR), and optionally requests Singularity image builds or removals on CVMFS.
 
 ## Inputs
 
@@ -67,14 +67,12 @@ Build for Docker Hub only:
 ```yaml
 jobs:
   publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: WIPACrepo/wipac-dev-publish-image-action@...
-        with:
-          image: myorg/myimage
-          action: BUILD
-          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
-          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+    uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
+    with:
+      image: myorg/myimage
+      action: BUILD
+      dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
 
 Build for ghcr.io + CVMFS:
@@ -82,15 +80,13 @@ Build for ghcr.io + CVMFS:
 ```yaml
 jobs:
   publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: WIPACrepo/wipac-dev-publish-image-action@...
-        with:
-          image: ghcr.io/myrepo/myimage
-          action: CVMFS_BUILD
-          ghcr_token: ${{ secrets.GITHUB_TOKEN }}
-          gh_cvmfs_token: ${{ secrets.CVMFS_PAT }}
-          cvmfs_dest_dir: myorg
+    uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
+    with:
+      image: ghcr.io/myrepo/myimage
+      action: CVMFS_BUILD
+      ghcr_token: ${{ secrets.GITHUB_TOKEN }}
+      gh_cvmfs_token: ${{ secrets.CVMFS_PAT }}
+      cvmfs_dest_dir: myorg
 ```
 
 ### Dynamic/Flexible Action
@@ -99,24 +95,31 @@ Build and/or remove for ghcr.io + CVMFS:
 
 ```yaml
 jobs:
-  image:
+  determine-action:
     runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.set.outputs.action }}
     steps:
       - name: Determine action
-        id: set_action
+        id: set
         run: |
-          if [[ "${{ github.event.inputs.replace_all }}" == "true" ]]; then
+          if [[ ... ]]; then
             echo "action=CVMFS_REMOVE_THEN_BUILD" >> "$GITHUB_OUTPUT"
+          elif [[ ... ]]; then
+            echo "action=CVMFS_REMOVE" >> "$GITHUB_OUTPUT"
           else
             echo "action=CVMFS_BUILD" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: WIPACrepo/wipac-dev-publish-image-action@...
-        with:
-          image: ghcr.io/myrepo/myimage
-          action: ${{ steps.set_action.outputs.action }}
-          ghcr_token: ${{ secrets.GITHUB_TOKEN }}
-          gh_cvmfs_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          cvmfs_dest_dir: myorg/myrepo
-          cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
+  publish-or-remove:
+    needs: [ determine-action, ... ]
+    uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
+    with:
+      image: ghcr.io/myrepo/myimage
+      action: ${{ needs.determine-action.outputs.action }}
+      ghcr_token: ${{ secrets.GITHUB_TOKEN }}
+      gh_cvmfs_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      cvmfs_dest_dir: myorg/myrepo
+      cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
+
 ```
