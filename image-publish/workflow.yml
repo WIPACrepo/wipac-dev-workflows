@@ -67,7 +67,7 @@ on:
 
 
 jobs:
-  determine-plan:
+  gameplan:
     runs-on: ubuntu-latest
     outputs:
       do-remove-from-cvmfs: ${{ steps.set.outputs.do-remove-from-cvmfs }}
@@ -152,8 +152,8 @@ jobs:
 
 
   remove-from-cvmfs:
-    if: needs.determine-plan.outputs.do-remove-from-cvmfs == 'true'
-    needs: [ determine-plan ]
+    if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
+    needs: [ gameplan ]
     runs-on: ubuntu-latest
     steps:
       - name: Generate CVMFS image nametags to remove
@@ -164,7 +164,7 @@ jobs:
           python -c '
           import os
           tags = """${{ inputs.cvmfs_remove_tags }}"""
-          image = "${{ needs.determine-plan.outputs.image-name }}"
+          image = "${{ needs.gameplan.outputs.image-name }}"
           print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
           ' > delete_image_nametags.txt
           
@@ -181,11 +181,11 @@ jobs:
 
 
   build-w-platform-and-publish-by-sha:
-    if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
-    needs: [ determine-plan ]
+    if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+    needs: [ gameplan ]
     strategy:
       matrix:
-        include: ${{ fromJson(needs.determine-plan.outputs.build-platform-matrix) }}
+        include: ${{ fromJson(needs.gameplan.outputs.build-platform-matrix) }}
     runs-on: ${{ matrix.runner }}
     name: Build+publish image (${{ matrix.platform }})
     steps:
@@ -237,9 +237,9 @@ jobs:
 
 
   tag-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
-    if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
+    if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
     needs: [
-      determine-plan,
+      gameplan,
       build-w-platform-and-publish-by-sha, # needed b/c image(s) need to be published before tagging/merging
     ]
     runs-on: ubuntu-latest
@@ -303,9 +303,9 @@ jobs:
 
 
   build-on-cvmfs:
-    if: needs.determine-plan.outputs.do-build-on-cvmfs == 'true'
+    if: needs.gameplan.outputs.do-build-on-cvmfs == 'true'
     needs: [
-      determine-plan,
+      gameplan,
       remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
       tag-published-images,  # needed for retrieving images
     ]
