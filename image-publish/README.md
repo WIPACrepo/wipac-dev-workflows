@@ -41,11 +41,11 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 
 #### If interacting with CVMFS
 
-| Name                | Required                          | Description                                                                                                                                  |
-|---------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `gh_cvmfs_token`    | ✅, if using CVMFS                 | GitHub PAT used to interact with  [`WIPACrepo/build-singularity-cvmfs-action`](https://github.com/WIPACrepo/build-singularity-cvmfs-action/) |
-| `cvmfs_dest_dir`    | ✅, if using CVMFS                 | CVMFS destination directory for Singularity images                                                                                           |
-| `cvmfs_remove_tags` | ⚠️, only if removing CVMFS images | Newline-delimited list of image **tags** to remove from CVMFS (e.g., `latest`, `main-[SHA]`)                                                 |
+| Name                 | Required                          | Description                                                                                                                                  |
+|----------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `cvmfs_github_token` | ✅, if using CVMFS                 | GitHub PAT used to interact with  [`WIPACrepo/build-singularity-cvmfs-action`](https://github.com/WIPACrepo/build-singularity-cvmfs-action/) |
+| `cvmfs_dest_dir`     | ✅, if using CVMFS                 | CVMFS destination directory for Singularity images                                                                                           |
+| `cvmfs_remove_tags`  | ⚠️, only if removing CVMFS images | Newline-delimited list of image **tags** to remove from CVMFS (e.g., `latest`, `main-[SHA]`)                                                 |
 
 _All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](https://github.com/WIPACrepo/cvmfs-actions) and listed in its [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)_.
 
@@ -85,7 +85,7 @@ jobs:
       image: ghcr.io/myrepo/myimage
       mode: CVMFS_BUILD
       registry_token: ${{ secrets.GITHUB_TOKEN }}
-      gh_cvmfs_token: ${{ secrets.CVMFS_PAT }}
+      cvmfs_github_token: ${{ secrets.CVMFS_PAT }}
       cvmfs_dest_dir: myorg
 ```
 
@@ -118,7 +118,7 @@ jobs:
       image: ghcr.io/myrepo/myimage
       mode: ${{ needs.determine-mode.outputs.mode }}
       registry_token: ${{ secrets.GITHUB_TOKEN }}
-      gh_cvmfs_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      cvmfs_github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       cvmfs_dest_dir: myorg/myrepo
       cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
 

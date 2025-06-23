@@ -32,21 +32,24 @@ on:
           EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
           EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
         required: false
-      gh_cvmfs_token:
+      cvmfs_github_token:
         description: |
           IF USING CVMFS (else, var is ignored):
             A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
         required: false
       cvmfs_dest_dir:
         description: |
           IF USING CVMFS (else, var is ignored):
             The CVMFS directory to place the singularity image built from the docker image
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
         required: false
       cvmfs_remove_tags:
         description: |
           IF REMOVING ON CVMFS (else, var is ignored):
             The image **TAGS** (i.e. 'bar' in 'baz/foo:bar') to remove on CVMFS -- newline-delimited
-            tags can be a pattern-based or verbatim -- see https://github.com/WIPACrepo/build-singularity-cvmfs-action
+            tags can be a pattern-based or verbatim
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
           EXAMPLE: '$ {{ github.ref_name }}-[SHA]' (no space after $)
         required: false
       free_disk_space:
@@ -139,7 +142,7 @@ jobs:
         if: env.DO_1_CVMFS_REMOVE == 'true'
         uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
-          github_token: ${{ inputs.gh_cvmfs_token }}
+          github_token: ${{ inputs.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
           delete_image_nametags: ${{ steps.remove.outputs.delete_image_nametags }}
 
@@ -198,6 +201,6 @@ jobs:
         if: env.DO_3_CVMFS_BUILD == 'true'
         uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
-          github_token: ${{ inputs.gh_cvmfs_token }}
+          github_token: ${{ inputs.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
           build_images: ${{ steps.docker_meta.outputs.tags }}
