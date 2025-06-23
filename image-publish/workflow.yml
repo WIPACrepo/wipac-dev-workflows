@@ -156,7 +156,8 @@ jobs:
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
           {
-            echo "# 🧭 Build Workflow Plan"
+            echo "# 🧭 Workflow Plan — Mode: \`${{ inputs.mode }}\`"
+            echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${{ inputs.image }}"
@@ -371,7 +372,8 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           {
-            echo "# ✅ Final Build Summary"
+            echo "# ✅ Final Workflow Summary — Mode: \`${{ inputs.mode }}\`"
+            echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
             echo "## 📦 Image: \`${{ inputs.image }}\`"
             echo ""
