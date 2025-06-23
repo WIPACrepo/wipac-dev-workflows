@@ -6,14 +6,14 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 
 ### Required
 
-| Name     | Description                                                                                                                                                                                                                                                           |
-|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `image`  | Fully qualified Docker image name with optional registry prefix.<br>⚠️ **Do not include a tag or digest.** ⚠️<br>Examples: `ghcr.io/foo/bar`, `foo/bar` (Docker Hub)                                                                                                  |
-| `action` | What to do:<br>- `BUILD` – Build and publish Docker image on registry<br>- `CVMFS_BUILD` – `BUILD`, then request CVMFS to build/persist it<br>- `CVMFS_REMOVE` – Remove Singularity image(s) from CVMFS<br>- `CVMFS_REMOVE_THEN_BUILD` – Remove then rebuild on CVMFS |
+| Name    | Description                                                                                                                                                                                                                                                           |
+|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `image` | Fully qualified Docker image name with optional registry prefix.<br>⚠️ **Do not include a tag or digest.** ⚠️<br>Examples: `ghcr.io/foo/bar`, `foo/bar` (Docker Hub)                                                                                                  |
+| `mode`  | What to do:<br>- `BUILD` – Build and publish Docker image on registry<br>- `CVMFS_BUILD` – `BUILD`, then request CVMFS to build/persist it<br>- `CVMFS_REMOVE` – Remove Singularity image(s) from CVMFS<br>- `CVMFS_REMOVE_THEN_BUILD` – Remove then rebuild on CVMFS |
 
-#### Action Reference
+#### Mode Reference
 
-| Action                    | CVMFS Remove | Docker Build+Publish | CVMFS Build+Publish |
+| Mode                      | CVMFS Remove | Docker Build+Publish | CVMFS Build+Publish |
 |---------------------------|--------------|----------------------|---------------------|
 | `BUILD`                   |              | ✅                    |                     |
 | `CVMFS_BUILD`             |              | ✅ (1st)              | ✅ (2nd)             |
@@ -24,7 +24,7 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 
 > NOTE:
 >
-> Many input attributes only apply to certain `action`-based use cases. However, by design, any irrelevant input attributes for a given use case will be ignored. This allows workflows to be flexible, by having only one `uses: WIPACRepo/wipac-dev-publish-image-action` section, with logic around `action`. See the workflow snippet in the [Example Usage section](#example-usage).
+> Many input attributes only apply to certain `mode`-based use cases. However, by design, any irrelevant input attributes for a given use case will be ignored. This allows workflows to be flexible, by only including one call to the workflow, with logic around `mode`. See the workflow snippet in the [Example Usage section](#example-usage).
 
 #### If using DockerHub
 
@@ -60,7 +60,7 @@ _All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](
 
 Here are a few examples, out of many possible configurations.
 
-### Static/Single Action
+### Static/Single Mode
 
 Build for Docker Hub only:
 
@@ -70,7 +70,7 @@ jobs:
     uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
     with:
       image: myorg/myimage
-      action: BUILD
+      mode: BUILD
       dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
       dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
@@ -83,40 +83,40 @@ jobs:
     uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
     with:
       image: ghcr.io/myrepo/myimage
-      action: CVMFS_BUILD
+      mode: CVMFS_BUILD
       ghcr_token: ${{ secrets.GITHUB_TOKEN }}
       gh_cvmfs_token: ${{ secrets.CVMFS_PAT }}
       cvmfs_dest_dir: myorg
 ```
 
-### Dynamic/Flexible Action
+### Dynamic/Flexible Mode
 
 Build and/or remove for ghcr.io + CVMFS:
 
 ```yaml
 jobs:
-  determine-action:
+  determine-mode:
     runs-on: ubuntu-latest
     outputs:
-      action: ${{ steps.set.outputs.action }}
+      mode: ${{ steps.set.outputs.mode }}
     steps:
-      - name: Determine action
+      - name: Determine mode
         id: set
         run: |
           if [[ ... ]]; then
-            echo "action=CVMFS_REMOVE_THEN_BUILD" >> "$GITHUB_OUTPUT"
+            echo "mode=CVMFS_REMOVE_THEN_BUILD" >> "$GITHUB_OUTPUT"
           elif [[ ... ]]; then
-            echo "action=CVMFS_REMOVE" >> "$GITHUB_OUTPUT"
+            echo "mode=CVMFS_REMOVE" >> "$GITHUB_OUTPUT"
           else
-            echo "action=CVMFS_BUILD" >> "$GITHUB_OUTPUT"
+            echo "mode=CVMFS_BUILD" >> "$GITHUB_OUTPUT"
           fi
 
   publish-or-remove:
-    needs: [ determine-action, ... ]
+    needs: [ determine-mode, ... ]
     uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
     with:
       image: ghcr.io/myrepo/myimage
-      action: ${{ needs.determine-action.outputs.action }}
+      mode: ${{ needs.determine-mode.outputs.mode }}
       ghcr_token: ${{ secrets.GITHUB_TOKEN }}
       gh_cvmfs_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       cvmfs_dest_dir: myorg/myrepo
