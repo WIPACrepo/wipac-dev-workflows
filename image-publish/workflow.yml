@@ -127,19 +127,19 @@ jobs:
     if: needs.determine-plan.outputs.do-remove-from-cvmfs == 'true'
     needs: [ determine-plan ]
     runs-on: ubuntu-latest
-    outputs:
-      removed: true
     steps:
       - name: Generate CVMFS image nametags to remove
         id: gen
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
           python -c '
           import os
           tags = """${{ inputs.cvmfs_remove_tags }}"""
           image = "${{ needs.determine-plan.outputs.image-name }}"
           print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
           ' > delete_image_nametags.txt
+          
           echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
           cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
