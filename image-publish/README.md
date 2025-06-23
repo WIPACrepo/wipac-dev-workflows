@@ -51,10 +51,10 @@ _All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](
 
 #### Miscellaneous Build Configuration
 
-| Name              | Required | Description                                                             |
-|-------------------|----------|-------------------------------------------------------------------------|
-| `free_disk_space` | no       | `true` to make space on GitHub runner before building image             |
-| `build_platform`  | no       | Target build platform. Default: `linux/amd64`<br>Example: `linux/arm64` |
+| Name                  | Required | Description                                                                          |
+|-----------------------|----------|--------------------------------------------------------------------------------------|
+| `free_disk_space`     | no       | `true` to make space on GitHub runner before building image                          |
+| `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64` |
 
 ## Example Usage
 
