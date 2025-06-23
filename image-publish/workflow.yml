@@ -128,7 +128,7 @@ jobs:
           
           export INPUT_BUILD_PLATFORMS_CSV="${{ inputs.build_platforms_csv }}"
           
-          python -c '
+          matrix_json=$(python -c '
           import os, json
           
           platforms_csv = os.environ.get("INPUT_BUILD_PLATFORMS_CSV", "linux/amd64")
@@ -148,7 +148,9 @@ jobs:
           ]
           
           print(f"matrix={json.dumps(matrix)}")
-          ' >> "$GITHUB_OUTPUT"
+          ')
+          
+          echo "matrix=${matrix_json}" >> "$GITHUB_OUTPUT"
 
 
   remove-from-cvmfs:
