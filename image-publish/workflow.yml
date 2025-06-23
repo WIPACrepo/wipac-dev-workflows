@@ -154,9 +154,15 @@ jobs:
   build-and-publish-image:
     if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
     needs: [ determine-plan, remove-from-cvmfs ]
-    runs-on: ubuntu-latest
-    outputs:
-      image-tags: ${{ steps.docker_meta.outputs.tags }}
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: [ self-hosted, ARM64 ]  # or whatever label you use for ARM64-capable runners
+    runs-on: ${{ matrix.runner }}
+    name: Build and publish (${{ matrix.platform }})
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -196,7 +202,7 @@ jobs:
           password: ${{ inputs.registry_token }}
 
       - name: Setup QEMU
-        if: contains(inputs.build_platform, 'arm')
+        if: contains(matrix.platform, 'arm')
         uses: docker/setup-qemu-action@v2
 
       - name: Setup Buildx
@@ -206,10 +212,11 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          platforms: ${{ inputs.build_platform }}
+          platforms: ${{ matrix.platform }}
           push: true
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
+
 
   build-on-cvmfs:
     if: needs.determine-plan.outputs.do-build-on-cvmfs == 'true'
