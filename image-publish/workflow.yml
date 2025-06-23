@@ -180,9 +180,9 @@ jobs:
           delete_image_nametags: ${{ steps.gen.outputs.delete_image_nametags }}
 
 
-  build-and-publish-image:
+  build-w-platform-and-publish-by-sha:
     if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
-    needs: [ determine-plan, remove-from-cvmfs ]
+    needs: [ determine-plan ]
     strategy:
       matrix:
         include: ${{ fromJson(needs.determine-plan.outputs.build-platform-matrix) }}
@@ -191,16 +191,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
-      - id: docker_meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ inputs.image }}
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
       - uses: docker/login-action@v3
         with:
           registry: ${{ ( startsWith(inputs.image, 'ghcr.io/') && 'ghcr.io' ) || '' }}
           username: ${{ inputs.registry_username }}
           password: ${{ inputs.registry_token }}
+
+      # VERY BASIC METADATA - tagging occurs in 'tag-published-images' (job)
+      - id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.image }}
 
       # BUILD STEPS
       - if: inputs.free_disk_space == 'true'
@@ -220,7 +222,7 @@ jobs:
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       # USE ARTIFACTS
-      - name: Store digest in artifacts -- in a file named for the build platform
+      - name: Store digest (sha) as artifact -- in a file named for the build platform
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           mkdir -p ${{ runner.temp }}/digests
@@ -234,10 +236,15 @@ jobs:
           retention-days: 1
 
 
-  merge-manifest:
+  tag-published-images: # now, tag the image(s) just published -- this merges under a single manifest (if multiple images)
     if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
-    needs: [ determine-plan, build-and-publish-image ]
+    needs: [
+      determine-plan,
+      build-w-platform-and-publish-by-sha, # needed b/c image(s) need to be published before tagging/merging
+    ]
     runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.docker_meta.outputs.tags }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -249,31 +256,54 @@ jobs:
           username: ${{ inputs.registry_username }}
           password: ${{ inputs.registry_token }}
 
-      # MERGE IMAGES (MAKE THEM SHARE SAME TAGS)
+      # GENERATE TAGS
+      - id: docker_meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ inputs.image }}
+          tags: |
+            # running on: branch
+            type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
+            # running on: new tag
+            type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+
+      # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
       - name: Create and push manifest
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          tags_w_digests=""
+          # images (w/ sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
+          sha_images=""
           for f in digests/*.txt; do
             digest=$(cat "$f")
             echo "$digest"  # for logging
-            tags_w_digests="$tags_w_digests ${{ inputs.image }}@$digest"
+            sha_images="$sha_images ${{ inputs.image }}@$digest"
+          done
+          
+          # tags made from 'docker_meta' (step)
+          all_tags=""
+          for tag in ${{ steps.docker_meta.outputs.tags }}; do
+            all_tags="$all_tags --tag $tag"
           done
 
-          docker buildx imagetools create \
-            -t ${{ inputs.image }}:${{ github.ref_name }} \
-            $tags_w_digests
+          docker buildx imagetools create $all_tags $sha_images
 
 
   build-on-cvmfs:
     if: needs.determine-plan.outputs.do-build-on-cvmfs == 'true'
-    needs: [ determine-plan, build-and-publish-image, merge-manifest ]
+    needs: [
+      determine-plan,
+      remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
+      tag-published-images,  # needed for retrieving images
+    ]
     runs-on: ubuntu-latest
     steps:
       - uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
           github_token: ${{ inputs.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
-          build_images: ${{ needs.build-and-publish-image.outputs.image-tags }}
+          build_images: ${{ needs.tag-published-images.outputs.tags }}
