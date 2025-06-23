@@ -194,8 +194,8 @@ jobs:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
       - uses: docker/login-action@v3
         with:
-          registry: ${{ ( startsWith(inputs.image, 'ghcr.io/') && 'ghcr.io' ) || '' }}
-          username: ${{ inputs.registry_username }}
+          registry: ${{ ( startsWith(inputs.image, 'ghcr.io/') && 'ghcr.io' ) || 'docker.io' }}
+          username: ${{ inputs.registry_username }}  # may be empty -- ok
           password: ${{ inputs.registry_token }}
 
       # VERY BASIC METADATA - tagging occurs in 'tag-published-images' (job)
@@ -222,7 +222,7 @@ jobs:
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       # USE ARTIFACTS
-      - name: Store image digest (sha256:...) as artifact -- in a file named for the build platform
+      - name: Store platform-specific image digest (sha256:...) as artifact -- in a file named for the build platform
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           mkdir -p ${{ runner.temp }}/digests
@@ -276,7 +276,7 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          # image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
+          # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
           images_w_sha=""
           for f in digests/*.txt; do
             digest=$(cat "$f")
