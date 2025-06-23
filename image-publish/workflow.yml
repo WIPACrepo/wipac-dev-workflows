@@ -222,7 +222,7 @@ jobs:
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       # USE ARTIFACTS
-      - name: Store digest (sha) as artifact -- in a file named for the build platform
+      - name: Store image digest (sha256:...) as artifact -- in a file named for the build platform
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           mkdir -p ${{ runner.temp }}/digests
@@ -236,7 +236,7 @@ jobs:
           retention-days: 1
 
 
-  tag-published-images: # now, tag the image(s) just published -- this merges under a single manifest (if multiple images)
+  tag-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
     if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
     needs: [
       determine-plan,
@@ -276,12 +276,12 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          # images (w/ sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
-          sha_images=""
+          # image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
+          images_w_sha=""
           for f in digests/*.txt; do
             digest=$(cat "$f")
             echo "$digest"  # for logging
-            sha_images="$sha_images ${{ inputs.image }}@$digest"
+            images_w_sha="$images_w_sha ${{ inputs.image }}@$digest"
           done
           
           # tags made from 'docker_meta' (step) -- from newline-delimited string
@@ -298,7 +298,8 @@ jobs:
           fi
 
           # go!
-          docker buildx imagetools create $all_tags $sha_images
+          # create a single multi-platform image manifest with all tags pointing to published digests
+          docker buildx imagetools create $all_tags $images_w_sha
 
 
   build-on-cvmfs:
