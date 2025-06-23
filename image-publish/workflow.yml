@@ -12,7 +12,7 @@ on:
         required: true
       action:
         description: |
-          What action to perform:
+          The action to perform:
             BUILD                   - build and publish 'inputs.image'
             CVMFS_BUILD             - BUILD, then request CVMFS to build and persist 'inputs.image'
             CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
@@ -21,48 +21,48 @@ on:
       dockerhub_username:
         description: |
           IF USING DOCKER HUB (else, var is ignored):
-            the dockerhub username needed for publishing the image
+            The dockerhub username needed for publishing the image
           HINT: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
         required: false
       dockerhub_token:
         description: |
           IF USING DOCKER HUB (else, var is ignored):
-            the dockerhub token (password) needed for publishing the image
+            The dockerhub token (password) needed for publishing the image
           HINT: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
         required: false
       ghcr_token:
         description: |
           IF USING ghcr.io (else, var is ignored):
-            a GitHub token for authenticating with ghcr.io when pushing Docker images
+            A GitHub token for authenticating with ghcr.io when pushing Docker images
           HINT: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
         required: false
       gh_cvmfs_token:
         description: |
           IF USING CVMFS (else, var is ignored):
-            a PAT so the action can git push to GitHub (used for CVMFS build/removal requests)
+            A PAT so the action can git push to GitHub (used for CVMFS build/removal requests)
         required: false
       cvmfs_dest_dir:
         description: |
           IF USING CVMFS (else, var is ignored):
-            the CVMFS directory to place the singularity image built from the docker image
+            The CVMFS directory to place the singularity image built from the docker image
         required: false
       cvmfs_remove_tags:
         description: |
           IF REMOVING ON CVMFS (else, var is ignored):
-            the image **TAGS** (i.e. 'bar' in 'baz/foo:bar') to remove on CVMFS -- newline-delimited
+            The image **TAGS** (i.e. 'bar' in 'baz/foo:bar') to remove on CVMFS -- newline-delimited
             tags can be a pattern-based or verbatim -- see https://github.com/WIPACrepo/build-singularity-cvmfs-action
           Ex: '$ {{ github.ref_name }}-[SHA]' (no space after $)
         required: false
       free_disk_space:
         description: |
           IF BUILDING VERY LARGE IMAGES (else, var is ignored):
-            whether to free disk space on the GitHub runner before building the image
+            Whether to free disk space on the GitHub runner before building the image
         required: false
         default: "false"
       build_platform:
         description: |
           IF BUILDING IMAGE (else, var is ignored):
-            what CPU architecture platform to use when building the image
+            The CPU architecture platform to use when building the image
           Ex: '$ {{ github.event.inputs.platform || env.DEFAULT_PLATFORM }}' (no space after $)
         required: false
         default: "linux/amd64"
