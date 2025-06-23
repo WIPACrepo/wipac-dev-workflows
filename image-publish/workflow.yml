@@ -69,91 +69,101 @@ on:
 
 jobs:
 
-  image-publish:
+  determine-plan:
     runs-on: ubuntu-latest
+    outputs:
+      remove: ${{ steps.set.outputs.remove }}
+      build: ${{ steps.set.outputs.build }}
+      cvmfs: ${{ steps.set.outputs.cvmfs }}
+      image-name: ${{ steps.validate.outputs.image_name }}
+    steps:
+      - name: Determine workflow plan
+        id: set
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          echo "remove=false" >> "$GITHUB_OUTPUT"
+          echo "build=false" >> "$GITHUB_OUTPUT"
+          echo "cvmfs=false" >> "$GITHUB_OUTPUT"
+
+          case "${{ inputs.mode }}" in
+            CVMFS_REMOVE|CVMFS_REMOVE_THEN_BUILD)
+              echo "remove=true" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          case "${{ inputs.mode }}" in
+            BUILD|CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
+              echo "build=true" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+          case "${{ inputs.mode }}" in
+            CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
+              echo "cvmfs=true" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Validate image format
+        id: validate
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          last_segment=$(basename "${{ inputs.image }}")
+          if [[ "$last_segment" == *:* || "$last_segment" == *@* ]]; then
+            echo "::error::'image' must not include a tag or digest"
+            exit 1
+          fi
+          
+          echo "image_name=$last_segment" >> "$GITHUB_OUTPUT"
+
+  remove-from-cvmfs:
+    if: needs.determine-plan.outputs.remove == 'true'
+    needs: [ determine-plan ]
+    runs-on: ubuntu-latest
+    outputs:
+      removed: true
+    steps:
+      - name: Generate CVMFS image nametags to remove
+        id: gen
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          python -c '
+          import os
+          tags = """${{ inputs.cvmfs_remove_tags }}"""
+          image = "${{ needs.determine-plan.outputs.image-name }}"
+          print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
+          ' > delete_image_nametags.txt
+          
+          echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
+          cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Request CVMFS removal
+        uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
+        with:
+          github_token: ${{ inputs.cvmfs_github_token }}
+          dest_dir: ${{ inputs.cvmfs_dest_dir }}
+          delete_image_nametags: ${{ steps.gen.outputs.delete_image_nametags }}
+
+  build-and-publish-image:
+    if: needs.determine-plan.outputs.build == 'true'
+    needs: [ determine-plan, remove-from-cvmfs ]
+    runs-on: ubuntu-latest
+    outputs:
+      image-tags: ${{ steps.docker_meta.outputs.tags }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
 
-      - name: Determine mode steps
-        run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          
-          echo "DO_1_CVMFS_REMOVE=false" >> "$GITHUB_ENV"
-          echo "DO_2_BUILD=false" >> "$GITHUB_ENV"
-          echo "DO_3_CVMFS_BUILD=false" >> "$GITHUB_ENV"
-
-          case "${{ inputs.mode }}" in
-            CVMFS_REMOVE|CVMFS_REMOVE_THEN_BUILD)
-              echo "DO_1_CVMFS_REMOVE=true" >> "$GITHUB_ENV"
-              ;;
-          esac
-
-          case "${{ inputs.mode }}" in
-            BUILD|CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
-              echo "DO_2_BUILD=true" >> "$GITHUB_ENV"
-              ;;
-          esac
-
-          case "${{ inputs.mode }}" in
-            CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
-              echo "DO_3_CVMFS_BUILD=true" >> "$GITHUB_ENV"
-              ;;
-          esac
-
-      - name: Validate image format
-        run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          
-          if [[ ! "${{ inputs.image }}" =~ ^[^/]+/[^/]+(/[^/]+)?$ ]]; then
-            echo "::error::'image' must be in form 'namespace/image' or 'registry/namespace/image'"
-            exit 1
-          fi
-          last_segment=$(basename "${{ inputs.image }}")
-          if [[ "$last_segment" == *:* || "$last_segment" == *@* ]]; then
-            echo "::error::'image' must not include a tag or digest"
-            exit 1
-          else
-            echo "IMAGE_NAME=$last_segment" >> "$GITHUB_ENV"
-          fi
-
-      - name: Remove CVMFS images (if applicable)
-        if: env.DO_1_CVMFS_REMOVE == 'true'
-        run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          
-          if [[ -z "${{ inputs.cvmfs_remove_tags }}" ]]; then
-            echo "::error::cvmfs_remove_tags must be given"
-            exit 1
-          fi
-          python -c '
-          import os
-          image_name = os.environ["IMAGE_NAME"]
-          tags = """${{ inputs.cvmfs_remove_tags }}"""
-          print("\n".join(f"{image_name}:{t.strip()}" for t in tags.splitlines() if t.strip()))
-          ' > delete_image_nametags.txt
-          echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
-          cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Run CVMFS removal action
-        if: env.DO_1_CVMFS_REMOVE == 'true'
-        uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
-        with:
-          github_token: ${{ inputs.cvmfs_github_token }}
-          dest_dir: ${{ inputs.cvmfs_dest_dir }}
-          delete_image_nametags: ${{ steps.remove.outputs.delete_image_nametags }}
-
       - name: Free disk space
-        if: env.DO_2_BUILD == 'true' && inputs.free_disk_space == 'true'
+        if: inputs.free_disk_space == 'true'
         uses: jlumbroso/free-disk-space@main
         with:
           docker-images: false
 
       - name: Docker metadata
-        if: env.DO_2_BUILD == 'true'
         id: docker_meta
         uses: docker/metadata-action@v4
         with:
@@ -165,14 +175,14 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
 
       - name: Container registry log-in (Docker Hub)
-        if: env.DO_2_BUILD == 'true' && ! startsWith(inputs.image, 'ghcr.io/')
+        if: !startsWith(inputs.image, 'ghcr.io/')
         uses: docker/login-action@v2
         with:
           username: ${{ inputs.registry_username }}
           password: ${{ inputs.registry_token }}
 
       - name: Container registry log-in (GHCR)
-        if: env.DO_2_BUILD == 'true' && startsWith(inputs.image, 'ghcr.io/')
+        if: startsWith(inputs.image, 'ghcr.io/')
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
@@ -180,15 +190,13 @@ jobs:
           password: ${{ inputs.registry_token }}
 
       - name: Setup QEMU
-        if: env.DO_2_BUILD == 'true' && contains(inputs.build_platform, 'arm')
+        if: contains(inputs.build_platform, 'arm')
         uses: docker/setup-qemu-action@v2
 
       - name: Setup Buildx
-        if: env.DO_2_BUILD == 'true'
         uses: docker/setup-buildx-action@v2
 
       - name: Docker build and push
-        if: env.DO_2_BUILD == 'true'
         uses: docker/build-push-action@v3
         with:
           context: .
@@ -197,10 +205,14 @@ jobs:
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
 
-      - name: Build Singularity on CVMFS
-        if: env.DO_3_CVMFS_BUILD == 'true'
+  build-on-cvmfs:
+    if: needs.determine-plan.outputs.cvmfs == 'true'
+    needs: [ determine-plan, build-and-publish-image ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request CVMFS build
         uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
           github_token: ${{ inputs.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
-          build_images: ${{ steps.docker_meta.outputs.tags }}
+          build_images: ${{ needs.build-and-publish-image.outputs.image-tags }}
