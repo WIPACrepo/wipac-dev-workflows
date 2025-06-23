@@ -150,6 +150,36 @@ jobs:
           
           echo "matrix=${matrix_json}" >> "$GITHUB_OUTPUT"
 
+      - name: Summary (appears in GitHub UI)
+        if: always()
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          {
+            echo "# 🧭 Build Workflow Plan"
+            echo ""
+            echo "### 🔧 Inputs"
+            echo "- \`image\` = ${{ inputs.image }}"
+            echo "- \`mode\` = ${{ inputs.mode }}"
+            echo "- \`registry_username\` = ${{ inputs.registry_username || 'null' }}"
+            echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
+            echo "- \`cvmfs_remove_tags\` ="
+            echo '```'
+            echo "${{ inputs.cvmfs_remove_tags }}"
+            echo '```'
+            echo ""
+            echo "### 📋 Interpreted"
+            echo "- \`image-name\` = ${{ steps.validate.outputs.image-name }}"
+            echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
+            echo ""
+            echo "### ⏭️ Planned Actions"
+            [[ "${{ steps.set.outputs.do-remove-from-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS image removal"
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- Will build & publish Docker image(s)"
+            [[ "${{ steps.set.outputs.do-build-on-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS Singularity build"
+            echo ""
+            echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
+          } >> "$GITHUB_STEP_SUMMARY"
+
 
   remove-from-cvmfs:
     if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
@@ -316,3 +346,56 @@ jobs:
           github_token: ${{ inputs.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
           build_images: ${{ needs.tag-published-images.outputs.tags }}
+
+  final-summary:
+    if: always()
+    needs: [
+      # after all jobs:
+      gameplan,
+      remove-from-cvmfs,
+      build-w-platform-and-publish-by-sha,
+      tag-published-images,
+      build-on-cvmfs,
+    ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: digests
+          path: digests
+
+      - name: Generate Final Summary (appears in GitHub UI)
+        if: always()
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          {
+            echo "# ✅ Final Build Summary"
+            echo ""
+            echo "## 📦 Image: \`${{ inputs.image }}\`"
+            echo ""
+
+            if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
+              echo "## 🔢 Tags Published"
+              echo '```'
+              echo "${{ needs.tag-published-images.outputs.tags }}"
+              echo '```'
+              echo ""
+              echo "## 🔍 Platform Digests"
+              for f in digests/*.txt; do
+                digest=$(cat "$f")
+                platform=$(basename "$f" .txt | tr '_' '/')
+                echo "- \`$platform\` → \`${{ inputs.image }}@$digest\`"
+              done
+              echo ""
+            fi
+
+            if [[ "${{ needs.gameplan.outputs.do-build-on-cvmfs }}" == "true" || "${{ needs.gameplan.outputs.do-remove-from-cvmfs }}" == "true" ]]; then
+              echo "## 📁 CVMFS"
+              echo "See [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)"
+              echo ""
+            fi
+
+            echo "_Summary generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
+          } >> "$GITHUB_STEP_SUMMARY"
