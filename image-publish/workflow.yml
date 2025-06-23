@@ -290,7 +290,14 @@ jobs:
           for tag in "${tag_arr[@]}"; do
               all_tags+=" --tag $tag"
           done
+          
+          # validate
+          if [[ -z "$all_tags" ]]; then
+              echo "::error::No tags were generated to apply to the manifest."
+              exit 1
+          fi
 
+          # go!
           docker buildx imagetools create $all_tags $sha_images
 
 
