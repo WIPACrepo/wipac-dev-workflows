@@ -80,7 +80,8 @@ jobs:
 
       - name: Determine action steps
         run: |
-          set -euo pipefail
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
           echo "DO_1_CVMFS_REMOVE=false" >> "$GITHUB_ENV"
           echo "DO_2_BUILD=false" >> "$GITHUB_ENV"
           echo "DO_3_CVMFS_BUILD=false" >> "$GITHUB_ENV"
@@ -105,7 +106,8 @@ jobs:
 
       - name: Validate image format
         run: |
-          set -euo pipefail
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
           if [[ ! "${{ inputs.image }}" =~ ^[^/]+/[^/]+(/[^/]+)?$ ]]; then
             echo "::error::'image' must be in form 'namespace/image' or 'registry/namespace/image'"
             exit 1
@@ -121,7 +123,8 @@ jobs:
       - name: Remove CVMFS images (if applicable)
         if: env.DO_1_CVMFS_REMOVE == 'true'
         run: |
-          set -euo pipefail
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
           if [[ -z "${{ inputs.cvmfs_remove_tags }}" ]]; then
             echo "::error::cvmfs_remove_tags must be given"
             exit 1
