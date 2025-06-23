@@ -67,7 +67,6 @@ on:
 
 
 jobs:
-
   determine-plan:
     runs-on: ubuntu-latest
     outputs:
@@ -141,12 +140,11 @@ jobs:
           
           matrix = [
             {
-              "platform": p, 
+              "platform": p,
               "runner": label_map.get(p, "ubuntu-latest")
-            }
+            } 
             for p in platforms
           ]
-          
           print(f"matrix={json.dumps(matrix)}")
           ')
           
@@ -181,6 +179,7 @@ jobs:
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
           delete_image_nametags: ${{ steps.gen.outputs.delete_image_nametags }}
 
+
   build-and-publish-image:
     if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
     needs: [ determine-plan, remove-from-cvmfs ]
@@ -188,29 +187,21 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.determine-plan.outputs.build-platform-matrix) }}
     runs-on: ${{ matrix.runner }}
-    name: Build and publish (${{ matrix.platform }})
+    name: Build image (${{ matrix.platform }})
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-
-      - name: Free disk space
-        if: inputs.free_disk_space == 'true'
+      - if: inputs.free_disk_space == 'true'
         uses: jlumbroso/free-disk-space@main
         with:
           docker-images: false
 
-      - name: Docker metadata
-        id: docker_meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ inputs.image }}
-          tags: |
-            type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
-            type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
-            type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+      - if: contains(matrix.platform, 'arm')
+        uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-buildx-action@v2
 
       - name: Container registry log-in (Docker Hub)
         if: !startsWith(inputs.image, 'ghcr.io/')
@@ -218,7 +209,6 @@ jobs:
         with:
           username: ${{ inputs.registry_username }}
           password: ${{ inputs.registry_token }}
-
       - name: Container registry log-in (GHCR)
         if: startsWith(inputs.image, 'ghcr.io/')
         uses: docker/login-action@v1
@@ -227,30 +217,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ inputs.registry_token }}
 
-      - name: Setup QEMU
-        if: contains(matrix.platform, 'arm')
-        uses: docker/setup-qemu-action@v2
-
-      - name: Setup Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Docker build and push
-        uses: docker/build-push-action@v3
+      - id: build
+        uses: docker/build-push-action@v4
         with:
           context: .
           platforms: ${{ matrix.platform }}
           push: true
-          tags: ${{ steps.docker_meta.outputs.tags }}
-          labels: ${{ steps.docker_meta.outputs.labels }}
+          tags: ${{ inputs.image }}:${{ github.sha }}
+
+
+  merge-manifest:
+    if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
+    needs: [ determine-plan, build-and-publish-image ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Container registry log-in (Docker Hub)
+        if: !startsWith(inputs.image, 'ghcr.io/')
+        uses: docker/login-action@v2
+        with:
+          username: ${{ inputs.registry_username }}
+          password: ${{ inputs.registry_token }}
+      - name: Container registry log-in (GHCR)
+        if: startsWith(inputs.image, 'ghcr.io/')
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ inputs.registry_token }}
+
+      - name: Create and push manifest
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          docker buildx imagetools create \
+            -t ${{ inputs.image }}:${{ github.ref_name }} \
+            $(for d in "${{ needs.build-and-publish-image.outputs.digest }}"; do echo "${{ inputs.image }}@${d}"; done)
 
 
   build-on-cvmfs:
     if: needs.determine-plan.outputs.do-build-on-cvmfs == 'true'
-    needs: [ determine-plan, build-and-publish-image ]
+    needs: [ determine-plan, build-and-publish-image, merge-manifest ]
     runs-on: ubuntu-latest
     steps:
-      - name: Request CVMFS build
-        uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
+      - uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
           github_token: ${{ inputs.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
