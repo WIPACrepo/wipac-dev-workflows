@@ -10,9 +10,9 @@ on:
             include a registry if not storing with dockerhub
             ex: 'ghcr.io/foo/bar', 'foo/bar', etc.
         required: true
-      action:
+      mode:
         description: |
-          The action to perform:
+          The mode to use:
             BUILD                   - build and publish 'inputs.image'
             CVMFS_BUILD             - BUILD, then request CVMFS to build and persist 'inputs.image'
             CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
@@ -39,7 +39,7 @@ on:
       gh_cvmfs_token:
         description: |
           IF USING CVMFS (else, var is ignored):
-            A PAT so the action can git push to GitHub (used for CVMFS build/removal requests)
+            A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
         required: false
       cvmfs_dest_dir:
         description: |
@@ -78,7 +78,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Determine action steps
+      - name: Determine mode steps
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           
@@ -86,19 +86,19 @@ jobs:
           echo "DO_2_BUILD=false" >> "$GITHUB_ENV"
           echo "DO_3_CVMFS_BUILD=false" >> "$GITHUB_ENV"
 
-          case "${{ inputs.action }}" in
+          case "${{ inputs.mode }}" in
             CVMFS_REMOVE|CVMFS_REMOVE_THEN_BUILD)
               echo "DO_1_CVMFS_REMOVE=true" >> "$GITHUB_ENV"
               ;;
           esac
 
-          case "${{ inputs.action }}" in
+          case "${{ inputs.mode }}" in
             BUILD|CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
               echo "DO_2_BUILD=true" >> "$GITHUB_ENV"
               ;;
           esac
 
-          case "${{ inputs.action }}" in
+          case "${{ inputs.mode }}" in
             CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
               echo "DO_3_CVMFS_BUILD=true" >> "$GITHUB_ENV"
               ;;
