@@ -72,33 +72,41 @@ jobs:
   determine-plan:
     runs-on: ubuntu-latest
     outputs:
-      remove: ${{ steps.set.outputs.remove }}
-      build: ${{ steps.set.outputs.build }}
-      cvmfs: ${{ steps.set.outputs.cvmfs }}
-      image-name: ${{ steps.validate.outputs.image_name }}
+      do-remove-from-cvmfs: ${{ steps.set.outputs.do-remove-from-cvmfs }}
+      do-build-and-publish-image: ${{ steps.set.outputs.do-build-and-publish-image }}
+      do-build-on-cvmfs: ${{ steps.set.outputs.do-build-on-cvmfs }}
+      image-name: ${{ steps.validate.outputs.image-name }}
     steps:
       - name: Determine workflow plan
         id: set
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           
-          echo "remove=false" >> "$GITHUB_OUTPUT"
-          echo "build=false" >> "$GITHUB_OUTPUT"
-          echo "cvmfs=false" >> "$GITHUB_OUTPUT"
+          # set defaults
+          echo "do-remove-from-cvmfs=false" >> "$GITHUB_OUTPUT"
+          echo "do-build-and-publish-image=false" >> "$GITHUB_OUTPUT"
+          echo "do-build-on-cvmfs=false" >> "$GITHUB_OUTPUT"
 
+          # set
           case "${{ inputs.mode }}" in
-            CVMFS_REMOVE|CVMFS_REMOVE_THEN_BUILD)
-              echo "remove=true" >> "$GITHUB_OUTPUT"
+            CVMFS_REMOVE)
+              echo "do-remove-from-cvmfs=true" >> "$GITHUB_OUTPUT"
               ;;
-          esac
-          case "${{ inputs.mode }}" in
-            BUILD|CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
-              echo "build=true" >> "$GITHUB_OUTPUT"
+            BUILD)
+              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
               ;;
-          esac
-          case "${{ inputs.mode }}" in
-            CVMFS_BUILD|CVMFS_REMOVE_THEN_BUILD)
-              echo "cvmfs=true" >> "$GITHUB_OUTPUT"
+            CVMFS_BUILD)
+              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
+              echo "do-build-on-cvmfs=true" >> "$GITHUB_OUTPUT"
+              ;;
+            CVMFS_REMOVE_THEN_BUILD)
+              echo "do-remove-from-cvmfs=true" >> "$GITHUB_OUTPUT"
+              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
+              echo "do-build-on-cvmfs=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unrecognized mode: '${{ inputs.mode }}'"
+              exit 1
               ;;
           esac
 
@@ -113,10 +121,10 @@ jobs:
             exit 1
           fi
           
-          echo "image_name=$last_segment" >> "$GITHUB_OUTPUT"
+          echo "image-name=$last_segment" >> "$GITHUB_OUTPUT"
 
   remove-from-cvmfs:
-    if: needs.determine-plan.outputs.remove == 'true'
+    if: needs.determine-plan.outputs.do-remove-from-cvmfs == 'true'
     needs: [ determine-plan ]
     runs-on: ubuntu-latest
     outputs:
@@ -126,14 +134,12 @@ jobs:
         id: gen
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          
           python -c '
           import os
           tags = """${{ inputs.cvmfs_remove_tags }}"""
           image = "${{ needs.determine-plan.outputs.image-name }}"
           print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
           ' > delete_image_nametags.txt
-          
           echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
           cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -146,7 +152,7 @@ jobs:
           delete_image_nametags: ${{ steps.gen.outputs.delete_image_nametags }}
 
   build-and-publish-image:
-    if: needs.determine-plan.outputs.build == 'true'
+    if: needs.determine-plan.outputs.do-build-and-publish-image == 'true'
     needs: [ determine-plan, remove-from-cvmfs ]
     runs-on: ubuntu-latest
     outputs:
@@ -206,7 +212,7 @@ jobs:
           labels: ${{ steps.docker_meta.outputs.labels }}
 
   build-on-cvmfs:
-    if: needs.determine-plan.outputs.cvmfs == 'true'
+    if: needs.determine-plan.outputs.do-build-on-cvmfs == 'true'
     needs: [ determine-plan, build-and-publish-image ]
     runs-on: ubuntu-latest
     steps:
