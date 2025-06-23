@@ -252,12 +252,12 @@ jobs:
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       # USE ARTIFACTS
-      - name: Store platform-specific image digest (sha256:...) as artifact -- in a file named for the build platform
+      - name: Store platform-specific image@digest in a file named for the platform (for later tagging / manifest merging)
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           mkdir -p ${{ runner.temp }}/digests
-          echo "${{ steps.build.outputs.digest }}" \
-            > "${{ runner.temp }}/digests/${{ matrix.platform //\//_ }}.txt"
+          image_at_digest="${{ inputs.image }}@${{ steps.build.outputs.digest }}"
+          echo $image_at_digest > "${{ runner.temp }}/digests/${{ matrix.platform //\//_ }}.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: digests
@@ -309,9 +309,9 @@ jobs:
           # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
           images_w_sha=""
           for f in digests/*.txt; do
-            digest=$(cat "$f")
-            echo "$digest"  # for logging
-            images_w_sha="$images_w_sha ${{ inputs.image }}@$digest"
+            ref=$(cat "$f")
+            echo "$ref"  # for logging
+            images_w_sha="$images_w_sha $ref"
           done
           
           # tags made from 'docker_meta' (step) -- from newline-delimited string
@@ -384,9 +384,9 @@ jobs:
               echo ""
               echo "## 🔍 Platform Digests"
               for f in digests/*.txt; do
-                digest=$(cat "$f")
+                ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
-                echo "- \`$platform\` → \`${{ inputs.image }}@$digest\`"
+                echo "- \`$platform\` → \`$ref\`"
               done
               echo ""
             fi
