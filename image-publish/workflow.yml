@@ -284,10 +284,11 @@ jobs:
             sha_images="$sha_images ${{ inputs.image }}@$digest"
           done
           
-          # tags made from 'docker_meta' (step)
+          # tags made from 'docker_meta' (step) -- from newline-delimited string
           all_tags=""
-          for tag in ${{ steps.docker_meta.outputs.tags }}; do
-            all_tags="$all_tags --tag $tag"
+          readarray -t tag_arr <<< "${{ steps.docker_meta.outputs.tags }}"
+          for tag in "${tag_arr[@]}"; do
+              all_tags+=" --tag $tag"
           done
 
           docker buildx imagetools create $all_tags $sha_images
