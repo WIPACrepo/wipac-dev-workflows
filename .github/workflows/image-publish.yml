@@ -266,6 +266,7 @@ jobs:
 
           mkdir -p "${{ runner.temp }}/digests"
 
+          platform="${{ matrix.platform }}"  # store so to use bash character altering
           safe_platform="${platform//\//_}"
           image_at_digest="${{ inputs.image }}@${{ steps.build.outputs.digest }}"
 
