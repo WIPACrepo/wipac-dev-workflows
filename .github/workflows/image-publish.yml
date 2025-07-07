@@ -260,7 +260,7 @@ jobs:
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       # USE ARTIFACTS
-      - name: Store platform-specific image@digest in a file named for the platform (for later tagging / manifest merging)
+      - name: "Store platform-specific image@digest in a file named for the platform (for later tagging / manifest merging)"
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           mkdir -p ${{ runner.temp }}/digests
