@@ -131,20 +131,20 @@ jobs:
         id: build-platforms
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          
+
           export INPUT_BUILD_PLATFORMS_CSV="${{ inputs.build_platforms_csv }}"
-          
+
           matrix_json=$(python -c '
           import os, json
-          
+
           platforms_csv = os.environ.get("INPUT_BUILD_PLATFORMS_CSV", "linux/amd64")
           platforms = [s.strip() for s in platforms_csv.split(",") if s.strip()]
-          
+
           label_map = {
             "linux/amd64": "ubuntu-latest",
             "linux/arm64": "ubuntu-24.04-arm",
           }
-          
+
           matrix = [
             {
               "platform": p,
@@ -152,10 +152,12 @@ jobs:
             } 
             for p in platforms
           ]
-          print(f"matrix={json.dumps(matrix)}")
+          print(json.dumps(matrix))
           ')
-          
-          echo "matrix=${matrix_json}" >> "$GITHUB_OUTPUT"
+
+          echo "matrix<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$matrix_json" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Summary (appears in GitHub UI)
         if: always()
@@ -169,7 +171,7 @@ jobs:
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${{ inputs.image }}"
             echo "- \`mode\` = ${{ inputs.mode }}"
-            echo "- \`registry_username\` = ${{ inputs.registry_username || 'null' }}"
+            echo "- \`registry_username\` = ${{ secrets.registry_username || 'null' }}"
             echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
             echo "- \`cvmfs_remove_tags\` ="
             echo '```'
