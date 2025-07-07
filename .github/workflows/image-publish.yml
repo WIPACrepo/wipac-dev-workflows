@@ -263,9 +263,13 @@ jobs:
       - name: "Store platform-specific image@digest in a file named for the platform (for later tagging / manifest merging)"
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          mkdir -p ${{ runner.temp }}/digests
+
+          mkdir -p "${{ runner.temp }}/digests"
+
+          safe_platform="${platform//\//_}"
           image_at_digest="${{ inputs.image }}@${{ steps.build.outputs.digest }}"
-          echo $image_at_digest > "${{ runner.temp }}/digests/${{ matrix.platform //\//_ }}.txt"
+
+          echo "${image_at_digest}" > "${{ runner.temp }}/digests/${safe_platform}.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: digests
