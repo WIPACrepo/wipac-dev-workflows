@@ -92,7 +92,7 @@ jobs:
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
     with:
-      image: ghcr.io/myrepo/myimage
+      image: ghcr.io/myorg/myrepo
       mode: CVMFS_BUILD
       cvmfs_dest_dir: myorg
     secrets:
