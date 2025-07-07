@@ -20,29 +20,6 @@ on:
             CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
         type: string
         required: true
-      registry_username:
-        description: |
-          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
-            The username needed for publishing the image to a container registry -- 
-            if your registry does not need a username, use `registry_token`. 
-          EXAMPLE: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
-        type: string
-        required: false
-      registry_token:
-        description: |
-          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
-            The token/password needed for publishing the image to a container registry.
-          EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
-          EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
-        type: string
-        required: false
-      cvmfs_github_token:
-        description: |
-          IF USING CVMFS (else, var is ignored):
-            A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
-          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
-        type: string
-        required: false
       cvmfs_dest_dir:
         description: |
           IF USING CVMFS (else, var is ignored):
@@ -73,6 +50,27 @@ on:
         required: false
         type: string
         default: "linux/amd64,linux/arm64"
+    secrets:
+      registry_username:
+        description: |
+          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
+            The username needed for publishing the image to a container registry -- 
+            if your registry does not need a username, use `registry_token`. 
+          EXAMPLE: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
+        required: false
+      registry_token:
+        description: |
+          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
+            The token/password needed for publishing the image to a container registry.
+          EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
+          EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
+        required: false
+      cvmfs_github_token:
+        description: |
+          IF USING CVMFS (else, var is ignored):
+            A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
+        required: false
 
 
 jobs:

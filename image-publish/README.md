@@ -26,6 +26,26 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 >
 > Many input attributes only apply to certain `mode`-based use cases. However, by design, any irrelevant input attributes for a given use case will be ignored. This allows workflows to be flexible, by only including one call to the workflow, with logic around `mode`. See the workflow snippet in the [Example Usage section](#example-usage).
 
+#### If interacting with CVMFS
+
+| Name                | Required                          | Description                                                                                  |
+|---------------------|-----------------------------------|----------------------------------------------------------------------------------------------|
+| `cvmfs_dest_dir`    | ✅, if using CVMFS                 | CVMFS destination directory for Singularity images                                           |
+| `cvmfs_remove_tags` | ⚠️, only if removing CVMFS images | Newline-delimited list of image **tags** to remove from CVMFS (e.g., `latest`, `main-[SHA]`) |
+
+_All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](https://github.com/WIPACrepo/cvmfs-actions) and listed in its [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)_.
+
+#### Miscellaneous Build Configuration
+
+| Name                  | Required | Description                                                                          |
+|-----------------------|----------|--------------------------------------------------------------------------------------|
+| `free_disk_space`     | no       | `true` to make space on GitHub runner before building image                          |
+| `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64` |
+
+## Secrets
+
+Depending on the `mode`, secret(s) may be required:
+
 #### If using DockerHub
 
 | Name                | Required                      | Description         |
@@ -41,20 +61,9 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 
 #### If interacting with CVMFS
 
-| Name                 | Required                          | Description                                                                                                                                  |
-|----------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `cvmfs_github_token` | ✅, if using CVMFS                 | GitHub PAT used to interact with  [`WIPACrepo/build-singularity-cvmfs-action`](https://github.com/WIPACrepo/build-singularity-cvmfs-action/) |
-| `cvmfs_dest_dir`     | ✅, if using CVMFS                 | CVMFS destination directory for Singularity images                                                                                           |
-| `cvmfs_remove_tags`  | ⚠️, only if removing CVMFS images | Newline-delimited list of image **tags** to remove from CVMFS (e.g., `latest`, `main-[SHA]`)                                                 |
-
-_All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](https://github.com/WIPACrepo/cvmfs-actions) and listed in its [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)_.
-
-#### Miscellaneous Build Configuration
-
-| Name                  | Required | Description                                                                          |
-|-----------------------|----------|--------------------------------------------------------------------------------------|
-| `free_disk_space`     | no       | `true` to make space on GitHub runner before building image                          |
-| `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64` |
+| Name                 | Required          | Description                                                                                                                                  |
+|----------------------|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `cvmfs_github_token` | ✅, if using CVMFS | GitHub PAT used to interact with  [`WIPACrepo/build-singularity-cvmfs-action`](https://github.com/WIPACrepo/build-singularity-cvmfs-action/) |
 
 ## Example Usage
 
@@ -71,6 +80,7 @@ jobs:
     with:
       image: myorg/myimage
       mode: BUILD
+    secrets:
       registry_username: ${{ secrets.DOCKERHUB_USERNAME }}
       registry_token: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
@@ -84,9 +94,10 @@ jobs:
     with:
       image: ghcr.io/myrepo/myimage
       mode: CVMFS_BUILD
+      cvmfs_dest_dir: myorg
+    secrets:
       registry_token: ${{ secrets.GITHUB_TOKEN }}
       cvmfs_github_token: ${{ secrets.CVMFS_PAT }}
-      cvmfs_dest_dir: myorg
 ```
 
 ### Dynamic/Flexible Mode
@@ -117,9 +128,10 @@ jobs:
     with:
       image: ghcr.io/myrepo/myimage
       mode: ${{ needs.determine-mode.outputs.mode }}
-      registry_token: ${{ secrets.GITHUB_TOKEN }}
-      cvmfs_github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       cvmfs_dest_dir: myorg/myrepo
       cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
+    secrets:
+      registry_token: ${{ secrets.GITHUB_TOKEN }}
+      cvmfs_github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 ```
