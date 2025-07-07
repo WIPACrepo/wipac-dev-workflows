@@ -2,7 +2,7 @@ name: Build/Publish Docker Images and, optionally, Singularity Images on CVMFS
 
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       image:
         description: |
