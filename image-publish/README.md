@@ -126,7 +126,7 @@ jobs:
     needs: [ determine-mode, ... ]
     uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
     with:
-      image: ghcr.io/myrepo/myimage
+      image: ghcr.io/myorg/myrepo
       mode: ${{ needs.determine-mode.outputs.mode }}
       cvmfs_dest_dir: myorg/myrepo
       cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
