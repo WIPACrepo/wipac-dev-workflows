@@ -9,6 +9,7 @@ on:
           The full-qualified image (tagless) --
             include a registry if not storing with dockerhub
           EXAMPLE: 'ghcr.io/foo/bar', 'foo/bar', etc.
+        type: string
         required: true
       mode:
         description: |
@@ -17,6 +18,7 @@ on:
             CVMFS_BUILD             - BUILD, then request CVMFS to build and persist 'inputs.image'
             CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
             CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
+        type: string
         required: true
       registry_username:
         description: |
@@ -24,6 +26,7 @@ on:
             The username needed for publishing the image to a container registry -- 
             if your registry does not need a username, use `registry_token`. 
           EXAMPLE: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
+        type: string
         required: false
       registry_token:
         description: |
@@ -31,18 +34,21 @@ on:
             The token/password needed for publishing the image to a container registry.
           EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
           EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
+        type: string
         required: false
       cvmfs_github_token:
         description: |
           IF USING CVMFS (else, var is ignored):
             A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
           SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
+        type: string
         required: false
       cvmfs_dest_dir:
         description: |
           IF USING CVMFS (else, var is ignored):
             The CVMFS directory to place the singularity image built from the docker image
           SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
+        type: string
         required: false
       cvmfs_remove_tags:
         description: |
@@ -51,18 +57,21 @@ on:
             tags can be a pattern-based or verbatim
           SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
           EXAMPLE: '$ {{ github.ref_name }}-[SHA]' (no space after $)
+        type: string
         required: false
       free_disk_space:
         description: |
           IF BUILDING VERY LARGE IMAGES (else, var is ignored):
             Whether to free disk space on the GitHub runner before building the image
+        type: boolean
+        default: false
         required: false
-        default: "false"
       build_platforms_csv:
         description: |
           IF BUILDING IMAGE (else, var is ignored):
             Comma-delimited list of CPU architecture platforms to build (e.g. linux/amd64,linux/arm64)
         required: false
+        type: string
         default: "linux/amd64,linux/arm64"
 
 
