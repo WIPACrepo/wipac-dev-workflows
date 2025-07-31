@@ -1,4 +1,4 @@
-# WIPACrepo/wipac-dev-workflows/tag-and-release.yml
+# WIPACrepo/wipac-dev-workflows/.github/workflows/tag-and-release.yml
 
 This GitHub Actions **reusable workflow** performs tagging, building, and releasing of a Python package. It:
 

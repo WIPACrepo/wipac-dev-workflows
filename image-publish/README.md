@@ -1,4 +1,4 @@
-# WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml
+# WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml
 
 This GitHub Actions workflow builds and pushes Docker images to Docker Hub or GitHub Container Registry (GHCR), and optionally requests Singularity image builds or removals on CVMFS.
 
