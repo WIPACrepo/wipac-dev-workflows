@@ -76,7 +76,7 @@ Build for Docker Hub only:
 ```yaml
 jobs:
   image-publish:
-    uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
+    uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
       image: myorg/myimage
       mode: BUILD
@@ -90,7 +90,7 @@ Build for ghcr.io + CVMFS:
 ```yaml
 jobs:
   image-publish:
-    uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
+    uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
       image: ghcr.io/myorg/myrepo
       mode: CVMFS_BUILD
@@ -124,7 +124,7 @@ jobs:
 
   image-publish:
     needs: [ determine-mode, ... ]
-    uses: WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml@v...
+    uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
       image: ghcr.io/myorg/myrepo
       mode: ${{ needs.determine-mode.outputs.mode }}

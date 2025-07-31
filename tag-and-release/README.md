@@ -44,7 +44,7 @@ jobs:
     # only run on main/default
     if: format('refs/heads/{0}', github.event.repository.default_branch) == github.ref
     needs: [ ... ]
-    uses: WIPACrepo/wipac-dev-workflows/tag-and-release/worlflow.yml@v...
+    uses: WIPACrepo/wipac-dev-workflows/.github/workflows/tag-and-release.yml@v...
     with:
       python-version: "${{ fromJSON(needs.py-versions.outputs.matrix)[0] }}"
       release-artifacts: |
