@@ -75,6 +75,9 @@ Build for Docker Hub only:
 
 ```yaml
 jobs:
+
+  ...
+
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
@@ -89,6 +92,9 @@ Build for ghcr.io + CVMFS:
 
 ```yaml
 jobs:
+
+  ...
+
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
@@ -106,6 +112,9 @@ Build and/or remove for ghcr.io + CVMFS:
 
 ```yaml
 jobs:
+
+  ...
+
   determine-mode:
     runs-on: ubuntu-latest
     outputs:
@@ -133,5 +142,4 @@ jobs:
     secrets:
       registry_token: ${{ secrets.GITHUB_TOKEN }}
       cvmfs_github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-
 ```

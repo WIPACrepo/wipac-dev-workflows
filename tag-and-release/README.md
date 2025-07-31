@@ -40,6 +40,9 @@ This GitHub Actions **reusable workflow** performs tagging, building, and releas
 
 ```yaml
 jobs:
+
+  ...
+
   tag-and-release:
     # only run on main/default
     if: format('refs/heads/{0}', github.event.repository.default_branch) == github.ref
