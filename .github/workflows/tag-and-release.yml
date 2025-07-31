@@ -29,14 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: tag-and-release
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: ${{ github.sha }}
+          fetch-depth: 0  # required to see tags and commits
+          ref: ${{ github.sha }}  # lock to triggered commit ('github.ref' is dynamic)
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5  # needed for building project
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -56,12 +54,14 @@ jobs:
         name: Tag new version
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          git tag v${{ steps.next-version.outputs.version }}
+          git tag v${{ steps.next-version.outputs.version }}  # note: prepend 'v'
           git push origin --tags
 
       - if: steps.next-version.outputs.version != ''
         name: Build Python package
         uses: WIPACrepo/wipac-dev-py-build-action@v1.1
+        # -> uses the most recent git tag for versioning (aka the one made above)
+        # -> creates 'dist/' files
 
       - if: steps.next-version.outputs.version != '' && inputs.release-artifacts != ''
         name: Download extra artifacts
@@ -80,7 +80,7 @@ jobs:
         name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.next-version.outputs.version }}
+          tag_name: v${{ steps.next-version.outputs.version }}  # must match git tag above
           generate_release_notes: true
           files: |
             dist/*
