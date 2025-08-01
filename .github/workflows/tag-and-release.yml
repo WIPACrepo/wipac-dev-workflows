@@ -1,4 +1,4 @@
-name: tag-and-release workflow
+name: Tag, Build, and Release of a Python package; Optionally, Publish to PyPI
 
 on:
   workflow_call:
