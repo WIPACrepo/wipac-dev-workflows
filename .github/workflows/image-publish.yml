@@ -235,14 +235,14 @@ jobs:
 
       # LOG INTO CONTAINER REGISTRY
       - name: Docker login to GHCR.io
-        if: startsWith(inputs.image, 'ghcr.io/')
+        if: ${{ startsWith(inputs.image, 'ghcr.io/') }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.registry_token }}
       - name: Docker login to Docker Hub
-        if: !startsWith(inputs.image, 'ghcr.io/')
+        if: ${{ !startsWith(inputs.image, 'ghcr.io/') }}
         uses: docker/login-action@v3
         with:
           registry: docker.io
