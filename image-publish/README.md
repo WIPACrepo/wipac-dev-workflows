@@ -83,8 +83,8 @@ jobs:
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      registry: docker.io
-      namespace: myorg
+      image_registry: docker.io
+      image_namespace: myorg
       image_name: myimage
       mode: BUILD
     secrets:
@@ -102,8 +102,8 @@ jobs:
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      registry: ghcr.io
-      namespace: myorg
+      image_registry: ghcr.io
+      image_namespace: myorg
       image_name: myrepo
       mode: CVMFS_BUILD
       cvmfs_dest_dir: myorg
@@ -122,8 +122,8 @@ jobs:
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      registry: harbor.icecube.aq
-      namespace: icecube-project
+      image_registry: harbor.icecube.aq
+      image_namespace: icecube-project
       image_name: scanner
       mode: BUILD
     secrets:
@@ -160,13 +160,12 @@ jobs:
     needs: [ determine-mode, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      registry: ghcr.io
-      namespace: myorg
+      image_registry: ghcr.io
+      image_namespace: myorg
       image_name: myrepo
       mode: ${{ needs.determine-mode.outputs.mode }}
       cvmfs_dest_dir: myorg/myrepo
       cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
     secrets:
-      registry_token: ${{ secrets.GITHUB_TOKEN }}
       cvmfs_github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 ```
