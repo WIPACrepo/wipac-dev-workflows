@@ -1,26 +1,31 @@
 name: Build/Publish Docker Images and, optionally, Singularity Images on CVMFS
 
-
 on:
   workflow_call:
     inputs:
       registry:
         description: |
-          Container registry hostname.
+          Container registry hostname (no namespace).
           Examples: ghcr.io, docker.io, harbor.icecube.aq
         type: string
         required: true
-      image:
+      namespace:
         description: |
-          Repository path for the image (no registry, no tag, no digest).
-          Examples: foo/bar, myproject/myimage
+          Namespace or project path in the registry (can include slashes).
+          Examples: foo, foo/bar, myproject
+        type: string
+        required: true
+      image_name:
+        description: |
+          Image name only (no registry, no namespace, no tag, no digest).
+          Examples: myimage, scanner
         type: string
         required: true
       mode:
         description: |
           The mode to use:
-            BUILD                   - build and publish 'inputs.image'
-            CVMFS_BUILD             - BUILD, then request CVMFS to build and persist 'inputs.image'
+            BUILD                   - build and publish the image
+            CVMFS_BUILD             - BUILD, then request CVMFS to build and persist the image
             CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
             CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
         type: string
@@ -77,7 +82,6 @@ on:
           SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
         required: false
 
-
 jobs:
   gameplan:
     runs-on: ubuntu-latest
@@ -85,7 +89,6 @@ jobs:
       do-remove-from-cvmfs: ${{ steps.set.outputs.do-remove-from-cvmfs }}
       do-build-and-publish-image: ${{ steps.set.outputs.do-build-and-publish-image }}
       do-build-on-cvmfs: ${{ steps.set.outputs.do-build-on-cvmfs }}
-      image-name: ${{ steps.validate.outputs.image-name }}
       build-platform-matrix: ${{ steps.build-platforms.outputs.matrix }}
     steps:
       - name: Determine workflow plan
@@ -124,13 +127,27 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          last_segment=$(basename "${{ inputs.registry }}/${{ inputs.image }}")
-          if [[ "$last_segment" == *:* || "$last_segment" == *@* ]]; then
-            echo "::error::'image' must not include a tag or digest"
+          registry="${{ inputs.registry }}"
+          namespace="${{ inputs.namespace }}"
+          image_name="${{ inputs.image_name }}"
+
+          # Registry: alphanum + ._- and optional :port, no slash
+          if [[ ! "$registry" =~ ^[a-z0-9._-]+(:[0-9]+)?$ ]]; then
+            echo "::error::'registry' contains invalid characters. Found: '$registry'"
             exit 1
           fi
 
-          echo "image-name=$last_segment" >> "$GITHUB_OUTPUT"
+          # Namespace: may contain '/', but no tag/digest
+          if [[ "$namespace" == *":"* ]] || [[ "$namespace" == *"@"* ]]; then
+            echo "::error::'namespace' must not include a tag or digest. Found: '$namespace'"
+            exit 1
+          fi
+
+          # Image name: alphanum + ._-, no slash
+          if [[ ! "$image_name" =~ ^[a-z0-9._-]+$ ]]; then
+            echo "::error::'image_name' contains invalid characters. Found: '$image_name'"
+            exit 1
+          fi
 
       - name: Prepare build-platform matrix
         id: build-platforms
@@ -168,13 +185,12 @@ jobs:
         if: always()
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-
           {
             echo "# 🧭 Workflow Plan — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
             echo "### 🔧 Inputs"
-            echo "- \`image\` = ${{ inputs.registry }}/${{ inputs.image }}"
+            echo "- \`image\` = ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}"
             echo "- \`mode\` = ${{ inputs.mode }}"
             echo "- \`registry_username\` = ${{ secrets.registry_username || 'null' }}"
             echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
@@ -184,7 +200,6 @@ jobs:
             echo '```'
             echo ""
             echo "### 📋 Interpreted"
-            echo "- \`image-name\` = ${{ steps.validate.outputs.image-name }}"
             echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
             echo ""
             echo "### ⏭️ Planned Actions"
@@ -209,7 +224,7 @@ jobs:
           python -c '
           import os
           tags = """${{ inputs.cvmfs_remove_tags }}"""
-          image = "${{ needs.gameplan.outputs.image-name }}"
+          image = "${{ inputs.image_name }}"
           print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
           ' > delete_image_nametags.txt
           
@@ -250,7 +265,7 @@ jobs:
       - id: docker_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.registry }}/${{ inputs.image }}
+          images: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}
 
       # BUILD STEPS
       - if: inputs.free_disk_space == 'true'
@@ -263,7 +278,7 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: ${{ inputs.registry }}/${{ inputs.image }}
+          tags: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
@@ -276,7 +291,7 @@ jobs:
 
           platform="${{ matrix.platform }}"  # store so to use bash character altering
           safe_platform="${platform//\//_}"
-          image_at_digest="${{ inputs.registry }}/${{ inputs.image }}@${{ steps.build.outputs.digest }}"
+          image_at_digest="${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
 
           echo "${image_at_digest}" > "${{ runner.temp }}/digests/${safe_platform}.txt"
       - uses: actions/upload-artifact@v4
@@ -315,7 +330,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ inputs.registry }}/${{ inputs.image }}
+            ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}
           tags: |
             # running on: branch
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
@@ -398,7 +413,7 @@ jobs:
             echo "# ✅ Final Workflow Summary — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
-            echo "## 📦 Image: \`${{ inputs.registry }}/${{ inputs.image }}\`"
+            echo "## 📦 Image: \`${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}\`"
             echo ""
 
             if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
