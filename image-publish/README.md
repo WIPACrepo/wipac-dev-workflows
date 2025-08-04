@@ -1,15 +1,17 @@
 # WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml
 
-This GitHub Actions workflow builds and pushes Docker images to Docker Hub or GitHub Container Registry (GHCR), and optionally requests Singularity image builds or removals on CVMFS.
+This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitHub Container Registry (GHCR), Harbor, or other container registries, and optionally requests Singularity image builds or removals on CVMFS.
 
 ## Inputs
 
 ### Required
 
-| Name    | Description                                                                                                                                                                                                                                                           |
-|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `image` | Fully qualified Docker image name with optional registry prefix.<br>⚠️ **Do not include a tag or digest.** ⚠️<br>Examples: `ghcr.io/foo/bar`, `foo/bar` (Docker Hub)                                                                                                  |
-| `mode`  | What to do:<br>- `BUILD` – Build and publish Docker image on registry<br>- `CVMFS_BUILD` – `BUILD`, then request CVMFS to build/persist it<br>- `CVMFS_REMOVE` – Remove Singularity image(s) from CVMFS<br>- `CVMFS_REMOVE_THEN_BUILD` – Remove then rebuild on CVMFS |
+| Name         | Description                                                                                                                                                                                                                                                           |
+|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `registry`   | Container registry hostname (no namespace).<br>Examples: `ghcr.io`, `docker.io`, `harbor.icecube.aq`                                                                                                                                                                  |
+| `namespace`  | Namespace or project path in the registry (may include `/`).<br>Examples: `foo`, `foo/bar`, `myproject`                                                                                                                                                               |
+| `image_name` | Image name only (no registry, no namespace, no tag, no digest).<br>Examples: `myimage`, `scanner`                                                                                                                                                                     |
+| `mode`       | What to do:<br>- `BUILD` – Build and publish Docker image on registry<br>- `CVMFS_BUILD` – `BUILD`, then request CVMFS to build/persist it<br>- `CVMFS_REMOVE` – Remove Singularity image(s) from CVMFS<br>- `CVMFS_REMOVE_THEN_BUILD` – Remove then rebuild on CVMFS |
 
 #### Mode Reference
 
@@ -33,7 +35,7 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub or Gi
 | `cvmfs_dest_dir`    | ✅, if using CVMFS                 | CVMFS destination directory for Singularity images                                           |
 | `cvmfs_remove_tags` | ⚠️, only if removing CVMFS images | Newline-delimited list of image **tags** to remove from CVMFS (e.g., `latest`, `main-[SHA]`) |
 
-_All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](https://github.com/WIPACrepo/cvmfs-actions) and listed in its [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)_.
+*All CVMFS Singularity images builds are handled by [`WIPACrepo/cvmfs-actions`](https://github.com/WIPACrepo/cvmfs-actions) and listed in its [docker\_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)*.
 
 #### Miscellaneous Build Configuration
 
@@ -81,7 +83,9 @@ jobs:
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      image: myorg/myimage
+      registry: docker.io
+      namespace: myorg
+      image_name: myimage
       mode: BUILD
     secrets:
       registry_username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -98,12 +102,33 @@ jobs:
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      image: ghcr.io/myorg/myrepo
+      registry: ghcr.io
+      namespace: myorg
+      image_name: myrepo
       mode: CVMFS_BUILD
       cvmfs_dest_dir: myorg
     secrets:
       registry_token: ${{ secrets.GITHUB_TOKEN }}
       cvmfs_github_token: ${{ secrets.CVMFS_PAT }}
+```
+
+Build for Harbor registry:
+
+```yaml
+jobs:
+
+  ...
+
+  image-publish:
+    uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
+    with:
+      registry: harbor.icecube.aq
+      namespace: icecube-project
+      image_name: scanner
+      mode: BUILD
+    secrets:
+      registry_username: ${{ secrets.HARBOR_USERNAME }}
+      registry_token: ${{ secrets.HARBOR_TOKEN }}
 ```
 
 ### Dynamic/Flexible Mode
@@ -135,7 +160,9 @@ jobs:
     needs: [ determine-mode, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     with:
-      image: ghcr.io/myorg/myrepo
+      registry: ghcr.io
+      namespace: myorg
+      image_name: myrepo
       mode: ${{ needs.determine-mode.outputs.mode }}
       cvmfs_dest_dir: myorg/myrepo
       cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
