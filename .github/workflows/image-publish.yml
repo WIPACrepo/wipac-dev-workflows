@@ -4,11 +4,16 @@ name: Build/Publish Docker Images and, optionally, Singularity Images on CVMFS
 on:
   workflow_call:
     inputs:
+      registry:
+        description: |
+          Container registry hostname.
+          Examples: ghcr.io, docker.io, harbor.icecube.aq
+        type: string
+        required: true
       image:
         description: |
-          The full-qualified image (tagless) --
-            include a registry if not storing with dockerhub
-          EXAMPLE: 'ghcr.io/foo/bar', 'foo/bar', etc.
+          Repository path for the image (no registry, no tag, no digest).
+          Examples: foo/bar, myproject/myimage
         type: string
         required: true
       mode:
