@@ -189,6 +189,7 @@ jobs:
             echo "# 🧭 Workflow Plan — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
+          
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}"
             echo "- \`mode\` = ${{ inputs.mode }}"
@@ -199,14 +200,17 @@ jobs:
             echo "${{ inputs.cvmfs_remove_tags }}"
             echo '```'
             echo ""
-            echo "### 📋 Interpreted"
-            echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
-            echo ""
+          
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "### 📋 Build Config"
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo ""
+          
             echo "### ⏭️ Planned Actions"
             [[ "${{ steps.set.outputs.do-remove-from-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS image removal"
             [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- Will build & publish Docker image(s)"
             [[ "${{ steps.set.outputs.do-build-on-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS Singularity build"
             echo ""
+          
             echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
           } >> "$GITHUB_STEP_SUMMARY"
 
