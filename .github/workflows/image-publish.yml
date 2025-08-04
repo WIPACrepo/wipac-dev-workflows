@@ -124,7 +124,7 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          last_segment=$(basename "${{ inputs.image }}")
+          last_segment=$(basename "${{ inputs.registry }}/${{ inputs.image }}")
           if [[ "$last_segment" == *:* || "$last_segment" == *@* ]]; then
             echo "::error::'image' must not include a tag or digest"
             exit 1
@@ -174,7 +174,7 @@ jobs:
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
             echo "### 🔧 Inputs"
-            echo "- \`image\` = ${{ inputs.image }}"
+            echo "- \`image\` = ${{ inputs.registry }}/${{ inputs.image }}"
             echo "- \`mode\` = ${{ inputs.mode }}"
             echo "- \`registry_username\` = ${{ secrets.registry_username || 'null' }}"
             echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
@@ -250,7 +250,7 @@ jobs:
       - id: docker_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.image }}
+          images: ${{ inputs.registry }}/${{ inputs.image }}
 
       # BUILD STEPS
       - if: inputs.free_disk_space == 'true'
@@ -263,7 +263,7 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: ${{ inputs.image }}
+          tags: ${{ inputs.registry }}/${{ inputs.image }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
@@ -276,7 +276,7 @@ jobs:
 
           platform="${{ matrix.platform }}"  # store so to use bash character altering
           safe_platform="${platform//\//_}"
-          image_at_digest="${{ inputs.image }}@${{ steps.build.outputs.digest }}"
+          image_at_digest="${{ inputs.registry }}/${{ inputs.image }}@${{ steps.build.outputs.digest }}"
 
           echo "${image_at_digest}" > "${{ runner.temp }}/digests/${safe_platform}.txt"
       - uses: actions/upload-artifact@v4
@@ -315,7 +315,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ inputs.image }}
+            ${{ inputs.registry }}/${{ inputs.image }}
           tags: |
             # running on: branch
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
@@ -398,7 +398,7 @@ jobs:
             echo "# ✅ Final Workflow Summary — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
-            echo "## 📦 Image: \`${{ inputs.image }}\`"
+            echo "## 📦 Image: \`${{ inputs.registry }}/${{ inputs.image }}\`"
             echo ""
 
             if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
