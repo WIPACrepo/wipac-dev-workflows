@@ -3,21 +3,21 @@ name: Build/Publish Docker Images and, optionally, Singularity Images on CVMFS
 on:
   workflow_call:
     inputs:
-      registry:
+      image_registry:
         description: |
-          Container registry hostname (no namespace).
+          The target image's container registry hostname (no namespace).
           Examples: ghcr.io, docker.io, harbor.icecube.aq
         type: string
         required: true
-      namespace:
+      image_namespace:
         description: |
-          Namespace or project path in the registry (can include slashes).
+          The target image's namespace or project path in the registry (can include slashes).
           Examples: foo, foo/bar, myproject
         type: string
         required: true
       image_name:
         description: |
-          Image name only (no registry, no namespace, no tag, no digest).
+          The target image's name (only the name – no registry, no namespace, no tag, no digest).
           Examples: myimage, scanner
         type: string
         required: true
@@ -127,8 +127,8 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          registry="${{ inputs.registry }}"
-          namespace="${{ inputs.namespace }}"
+          registry="${{ inputs.image_registry }}"
+          namespace="${{ inputs.image_namespace }}"
           image_name="${{ inputs.image_name }}"
 
           # Registry: alphanum + ._- and optional :port, no slash
@@ -191,7 +191,7 @@ jobs:
             echo ""
           
             echo "### 🔧 Inputs"
-            echo "- \`image\` = ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}"
+            echo "- \`image\` = ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}"
             echo "- \`mode\` = ${{ inputs.mode }}"
             echo "- \`registry_username\` = ${{ secrets.registry_username || 'null' }}"
             echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
@@ -261,15 +261,15 @@ jobs:
       - name: Docker login
         uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.registry }}
-          username: ${{ inputs.registry == 'ghcr.io' && github.actor || secrets.registry_username }}
-          password: ${{ inputs.registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
 
       # VERY BASIC METADATA - tagging occurs in 'tag-published-images' (job)
       - id: docker_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}
+          images: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
 
       # BUILD STEPS
       - if: inputs.free_disk_space == 'true'
@@ -282,7 +282,7 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}
+          tags: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
@@ -295,7 +295,7 @@ jobs:
 
           platform="${{ matrix.platform }}"  # store so to use bash character altering
           safe_platform="${platform//\//_}"
-          image_at_digest="${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
+          image_at_digest="${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
 
           echo "${image_at_digest}" > "${{ runner.temp }}/digests/${safe_platform}.txt"
       - uses: actions/upload-artifact@v4
@@ -325,16 +325,16 @@ jobs:
       - name: Docker login
         uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.registry }}
-          username: ${{ inputs.registry == 'ghcr.io' && github.actor || secrets.registry_username }}
-          password: ${{ inputs.registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
 
       # GENERATE TAGS
       - id: docker_meta
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}
+            ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           tags: |
             # running on: branch
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
@@ -417,7 +417,7 @@ jobs:
             echo "# ✅ Final Workflow Summary — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
-            echo "## 📦 Image: \`${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.image_name }}\`"
+            echo "## 📦 Image: \`${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}\`"
             echo ""
 
             if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
