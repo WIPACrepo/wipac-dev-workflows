@@ -1,1 +1,1 @@
-/home/revans/PycharmProjects/wipac-dev-workflows/.github/workflows/image-publish.md
+../.github/workflows/image-publish.md

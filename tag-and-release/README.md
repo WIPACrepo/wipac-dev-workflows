@@ -1,1 +1,1 @@
-/home/revans/PycharmProjects/wipac-dev-workflows/.github/workflows/tag-and-release.md
+../.github/workflows/tag-and-release.md
