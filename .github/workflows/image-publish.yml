@@ -1,0 +1,450 @@
+name: Build/Publish Docker Images and, optionally, Singularity Images on CVMFS
+
+on:
+  workflow_call:
+    inputs:
+      image_registry:
+        description: |
+          The target image's container registry hostname (no namespace).
+          Examples: ghcr.io, docker.io, harbor.icecube.aq
+        type: string
+        default: ghcr.io
+      image_namespace:
+        description: |
+          The target image's namespace or project path in the registry (can include slashes).
+          Examples: foo, foo/bar, myproject
+        type: string
+        required: true
+      image_name:
+        description: |
+          The target image's name (only the name – no registry, no namespace, no tag, no digest).
+          Examples: myimage, scanner
+        type: string
+        required: true
+      mode:
+        description: |
+          The mode to use:
+            BUILD                   - build and publish the image
+            CVMFS_BUILD             - BUILD, then request CVMFS to build and persist the image
+            CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
+            CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
+        type: string
+        required: true
+      cvmfs_dest_dir:
+        description: |
+          IF USING CVMFS (else, var is ignored):
+            The CVMFS directory to place the singularity image built from the docker image
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
+        type: string
+        required: false
+      cvmfs_remove_tags:
+        description: |
+          IF REMOVING ON CVMFS (else, var is ignored):
+            The image **TAGS** (i.e. 'bar' in 'baz/foo:bar') to remove on CVMFS -- newline-delimited
+            tags can be a pattern-based or verbatim
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
+          EXAMPLE: '$ {{ github.ref_name }}-[SHA]' (no space after $)
+        type: string
+        required: false
+      free_disk_space:
+        description: |
+          IF BUILDING VERY LARGE IMAGES (else, var is ignored):
+            Whether to free disk space on the GitHub runner before building the image
+        type: boolean
+        default: false
+        required: false
+      build_platforms_csv:
+        description: |
+          IF BUILDING IMAGE (else, var is ignored):
+            Comma-delimited list of CPU architecture platforms to build (e.g. linux/amd64,linux/arm64)
+        required: false
+        type: string
+        default: "linux/amd64,linux/arm64"
+    secrets:
+      registry_username:
+        description: |
+          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
+            The username needed for publishing the image to a container registry -- 
+            if your registry does not need a username, use `registry_token`. 
+          EXAMPLE: use $ {{ secrets.DOCKERHUB_USERNAME }} (no space after $)
+        required: false
+      registry_token:
+        description: |
+          IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
+            The token/password needed for publishing the image to a container registry.
+          EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
+          EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
+        required: false
+      cvmfs_github_token:
+        description: |
+          IF USING CVMFS (else, var is ignored):
+            A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
+          SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
+        required: false
+
+jobs:
+  gameplan:
+    runs-on: ubuntu-latest
+    outputs:
+      do-remove-from-cvmfs: ${{ steps.set.outputs.do-remove-from-cvmfs }}
+      do-build-and-publish-image: ${{ steps.set.outputs.do-build-and-publish-image }}
+      do-build-on-cvmfs: ${{ steps.set.outputs.do-build-on-cvmfs }}
+      build-platform-matrix: ${{ steps.build-platforms.outputs.matrix }}
+    steps:
+      - name: Determine workflow plan
+        id: set
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          echo "do-remove-from-cvmfs=false" >> "$GITHUB_OUTPUT"
+          echo "do-build-and-publish-image=false" >> "$GITHUB_OUTPUT"
+          echo "do-build-on-cvmfs=false" >> "$GITHUB_OUTPUT"
+
+          case "${{ inputs.mode }}" in
+            CVMFS_REMOVE)
+              echo "do-remove-from-cvmfs=true" >> "$GITHUB_OUTPUT"
+              ;;
+            BUILD)
+              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
+              ;;
+            CVMFS_BUILD)
+              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
+              echo "do-build-on-cvmfs=true" >> "$GITHUB_OUTPUT"
+              ;;
+            CVMFS_REMOVE_THEN_BUILD)
+              echo "do-remove-from-cvmfs=true" >> "$GITHUB_OUTPUT"
+              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
+              echo "do-build-on-cvmfs=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unrecognized mode: '${{ inputs.mode }}'"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate image format
+        id: validate
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          registry="${{ inputs.image_registry }}"
+          namespace="${{ inputs.image_namespace }}"
+          image_name="${{ inputs.image_name }}"
+
+          # Registry: alphanum + ._- and optional :port, no slash
+          if [[ ! "$registry" =~ ^[a-z0-9._-]+(:[0-9]+)?$ ]]; then
+            echo "::error::'registry' contains invalid characters. Found: '$registry'"
+            exit 1
+          fi
+
+          # Namespace: may contain '/', but no tag/digest
+          if [[ "$namespace" == *":"* ]] || [[ "$namespace" == *"@"* ]]; then
+            echo "::error::'namespace' must not include a tag or digest. Found: '$namespace'"
+            exit 1
+          fi
+
+          # Image name: alphanum + ._-, no slash
+          if [[ ! "$image_name" =~ ^[a-z0-9._-]+$ ]]; then
+            echo "::error::'image_name' contains invalid characters. Found: '$image_name'"
+            exit 1
+          fi
+
+      - name: Prepare build-platform matrix
+        id: build-platforms
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          export INPUT_BUILD_PLATFORMS_CSV="${{ inputs.build_platforms_csv }}"
+
+          matrix_json=$(python -c '
+          import os, json
+
+          platforms_csv = os.environ.get("INPUT_BUILD_PLATFORMS_CSV", "linux/amd64")
+          platforms = [s.strip() for s in platforms_csv.split(",") if s.strip()]
+
+          label_map = {
+            "linux/amd64": "ubuntu-latest",
+            "linux/arm64": "ubuntu-24.04-arm",
+          }
+
+          matrix = [
+            {
+              "platform": p,
+              "runner": label_map.get(p, "ubuntu-latest")
+            } 
+            for p in platforms
+          ]
+          print(json.dumps(matrix))
+          ')
+
+          echo "matrix<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$matrix_json" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Summary (appears in GitHub UI)
+        if: always()
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          {
+            echo "# 🧭 Workflow Plan — Mode: \`${{ inputs.mode }}\`"
+            echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
+            echo ""
+          
+            echo "### 🔧 Inputs"
+            echo "- \`image\` = ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}"
+            echo "- \`mode\` = ${{ inputs.mode }}"
+            echo "- \`registry_username\` = ${{ secrets.registry_username || 'null' }}"
+            echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
+            echo "- \`cvmfs_remove_tags\` ="
+            echo '```'
+            echo "${{ inputs.cvmfs_remove_tags }}"
+            echo '```'
+            echo ""
+          
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "### 📋 Build Config"
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo ""
+          
+            echo "### ⏭️ Planned Actions"
+            [[ "${{ steps.set.outputs.do-remove-from-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS image removal"
+            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- Will build & publish Docker image(s)"
+            [[ "${{ steps.set.outputs.do-build-on-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS Singularity build"
+            echo ""
+          
+            echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+
+  remove-from-cvmfs:
+    if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
+    needs: [ gameplan ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate CVMFS image nametags to remove
+        id: gen
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          python -c '
+          import os
+          tags = """${{ inputs.cvmfs_remove_tags }}"""
+          image = "${{ inputs.image_name }}"
+          print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
+          ' > delete_image_nametags.txt
+          
+          echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
+          cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Request CVMFS removal
+        uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
+        with:
+          github_token: ${{ secrets.cvmfs_github_token }}
+          dest_dir: ${{ inputs.cvmfs_dest_dir }}
+          delete_image_nametags: ${{ steps.gen.outputs.delete_image_nametags }}
+
+
+  build-w-platform-and-publish-by-sha:
+    if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+    needs: [ gameplan ]
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.gameplan.outputs.build-platform-matrix) }}
+    runs-on: ${{ matrix.runner }}
+    name: Build+publish image (${{ matrix.platform }})
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+
+      # LOG INTO CONTAINER REGISTRY
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
+
+      # VERY BASIC METADATA - tagging occurs in 'tag-published-images' (job)
+      - id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
+
+      # BUILD STEPS
+      - if: inputs.free_disk_space == 'true'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          docker-images: false
+      - uses: docker/setup-buildx-action@v3
+      - id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          tags: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      # USE ARTIFACTS
+      - name: "Store platform-specific image@digest in a file named for the platform"
+        id: save_digest
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          mkdir -p "${{ runner.temp }}/to-be-artifacts"
+
+          platform="${{ matrix.platform }}"
+          safe_platform="${platform//\//_}"  # replace / with _
+          image_at_digest="${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
+
+          echo "${image_at_digest}" > "${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
+          echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-digests-${{ steps.save_digest.outputs.safe_platform }}
+          path: ${{ runner.temp }}/to-be-artifacts/*
+          if-no-files-found: error
+          retention-days: 1
+
+
+  tag-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
+    if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+    needs: [
+      gameplan,
+      build-w-platform-and-publish-by-sha, # needed b/c image(s) need to be published before tagging/merging
+    ]
+    runs-on: ubuntu-latest
+    outputs:
+      tags: ${{ steps.docker_meta.outputs.tags }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: platform-digests-*
+          path: platform-digests
+          merge-multiple: true
+
+      # LOG INTO CONTAINER REGISTRY
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
+
+      # GENERATE TAGS
+      - id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
+          tags: |
+            # running on: branch
+            type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
+            # running on: new tag
+            type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+
+      # APPLY TAGS TO IMAGE(S)
+      - uses: docker/setup-buildx-action@v3
+      - name: Create and push manifest
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
+          images_w_sha=""
+          for f in platform-digests/*.txt; do
+            ref=$(cat "$f")
+            echo "$ref"  # for logging
+            images_w_sha="$images_w_sha $ref"
+          done
+          
+          # tags made from 'docker_meta' (step) -- from newline-delimited string
+          all_tags=""
+          readarray -t tag_arr <<< "${{ steps.docker_meta.outputs.tags }}"
+          for tag in "${tag_arr[@]}"; do
+              all_tags+=" --tag $tag"
+          done
+          
+          # validate
+          if [[ -z "$all_tags" ]]; then
+              echo "::error::No tags were generated to apply to the manifest."
+              exit 1
+          fi
+
+          # go!
+          # create a single multi-platform image manifest with all tags pointing to published digests
+          docker buildx imagetools create $all_tags $images_w_sha
+
+
+  build-on-cvmfs:
+    if: needs.gameplan.outputs.do-build-on-cvmfs == 'true'
+    needs: [
+      gameplan,
+      remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
+      tag-published-images,  # needed for retrieving images
+    ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
+        with:
+          github_token: ${{ secrets.cvmfs_github_token }}
+          dest_dir: ${{ inputs.cvmfs_dest_dir }}
+          build_images: ${{ needs.tag-published-images.outputs.tags }}
+
+  final-summary:
+    if: always()
+    needs: [
+      # after all jobs:
+      gameplan,
+      remove-from-cvmfs,
+      build-w-platform-and-publish-by-sha,
+      tag-published-images,
+      build-on-cvmfs,
+    ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download platform digests
+        if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: platform-digests-*
+          path: platform-digests
+          merge-multiple: true
+
+      - name: Generate Final Summary (appears in GitHub UI)
+        if: always()
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          {
+            echo "# ✅ Final Workflow Summary — Mode: \`${{ inputs.mode }}\`"
+            echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
+            echo ""
+            echo "## 📦 Image: \`${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}\`"
+            echo ""
+
+            if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
+              echo "## 🔢 Tags Published"
+              echo '```'
+              echo "${{ needs.tag-published-images.outputs.tags }}"
+              echo '```'
+              echo ""
+              echo "## 🔍 Platform Digests"
+              for f in platform-digests/*.txt; do
+                ref=$(cat "$f")
+                platform=$(basename "$f" .txt | tr '_' '/')
+                echo "- \`$platform\` → \`$ref\`"
+              done
+              echo ""
+            fi
+
+            if [[ "${{ needs.gameplan.outputs.do-build-on-cvmfs }}" == "true" || "${{ needs.gameplan.outputs.do-remove-from-cvmfs }}" == "true" ]]; then
+              echo "## 📁 CVMFS"
+              echo "See [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)"
+              echo ""
+            fi
+
+            echo "_Summary generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
+          } >> "$GITHUB_STEP_SUMMARY"
