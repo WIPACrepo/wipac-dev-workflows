@@ -292,19 +292,19 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          mkdir -p "${{ runner.temp }}/digests"
+          mkdir -p "${{ runner.temp }}/to-be-artifacts"
 
           platform="${{ matrix.platform }}"
           safe_platform="${platform//\//_}"  # replace / with _
           image_at_digest="${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
 
-          echo "${image_at_digest}" > "${{ runner.temp }}/digests/${safe_platform}.txt"
+          echo "${image_at_digest}" > "${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
           echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ steps.save_digest.outputs.safe_platform }}
-          path: ${{ runner.temp }}/digests/*
+          name: platform-digests-${{ steps.save_digest.outputs.safe_platform }}
+          path: ${{ runner.temp }}/to-be-artifacts/*
           if-no-files-found: error
           retention-days: 1
 
@@ -321,8 +321,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: digests-*
-          path: digests
+          pattern: platform-digests-*
+          path: platform-digests
           merge-multiple: true
 
       # LOG INTO CONTAINER REGISTRY
@@ -410,8 +410,9 @@ jobs:
         if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: digests
-          path: digests
+          pattern: platform-digests-*
+          path: platform-digests
+          merge-multiple: true
 
       - name: Generate Final Summary (appears in GitHub UI)
         if: always()
@@ -431,7 +432,7 @@ jobs:
               echo '```'
               echo ""
               echo "## 🔍 Platform Digests"
-              for f in digests/*.txt; do
+              for f in platform-digests/*.txt; do
                 ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
                 echo "- \`$platform\` → \`$ref\`"
