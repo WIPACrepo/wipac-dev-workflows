@@ -287,20 +287,23 @@ jobs:
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
 
       # USE ARTIFACTS
-      - name: "Store platform-specific image@digest in a file named for the platform (for later tagging / manifest merging)"
+      - name: "Store platform-specific image@digest in a file named for the platform"
+        id: save_digest
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
           mkdir -p "${{ runner.temp }}/digests"
 
-          platform="${{ matrix.platform }}"  # store so to use bash character altering
-          safe_platform="${platform//\//_}"
+          platform="${{ matrix.platform }}"
+          safe_platform="${platform//\//_}"  # replace / with _
           image_at_digest="${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
 
           echo "${image_at_digest}" > "${{ runner.temp }}/digests/${safe_platform}.txt"
+          echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: digests
+          name: digests-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -318,8 +321,9 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: digests
+          pattern: digests-*
           path: digests
+          merge-multiple: true
 
       # LOG INTO CONTAINER REGISTRY
       - name: Docker login
