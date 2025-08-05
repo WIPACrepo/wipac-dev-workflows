@@ -1,11 +1,15 @@
-name: Tag, Build, and Release of a Python package; Optionally, Publish to PyPI
+name: "Tag and Release Project; Optionally: Build Python Package, Publish to PyPI"
 
 on:
   workflow_call:
     inputs:
-      python-version:
-        description: "Python version to use for build"
+      project-type:
+        description: "Project type (only 'python' triggers an automatic build here)"
         required: true
+        type: string
+      python-version:
+        description: "Python version to use for build (only if project-type is 'python')"
+        required: false
         type: string
       release-artifacts:
         description: |
@@ -14,27 +18,59 @@ on:
         required: false
         type: string
       publish-to-pypi:
-        description: "If true, publish built package to PyPI"
+        description: "If true and project-type is 'python', publish built package to PyPI"
         required: false
         type: boolean
         default: false
     secrets:
       PYPI_TOKEN:
         required: false  # only required if 'publish-to-pypi' is true
-      PERSONAL_ACCESS_TOKEN:
-        required: true
 
 jobs:
   tag-and-release:
     runs-on: ubuntu-latest
     concurrency: tag-and-release  # prevent any possible race conditions
     steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          # Check that project-type is only lowercase letters
+          if [[ ! "${{ inputs.project-type }}" =~ ^[a-z]+$ ]]; then
+            echo "::error::project-type must be only lowercase letters (a-z)."
+            exit 1
+          fi
+
+          # PROJECT IS PYTHON
+          if [[ "${{ inputs.project-type }}" == "python" ]]; then
+            if [[ -z "${{ inputs.python-version }}" ]]; then
+              echo "::error::python-version is required when project-type is 'python'."
+              exit 1
+            fi
+            if [[ "${{ inputs.publish-to-pypi }}" == "true" && -z "${{ secrets.PYPI_TOKEN }}" ]]; then
+              echo "::error::PYPI_TOKEN secret must be set when publish-to-pypi is true for Python projects."
+              exit 1
+            fi
+          # PROJECT IS *NOT* PYTHON
+          else
+            if [[ -n "${{ inputs.python-version }}" ]]; then
+              echo "::error::python-version must not be set when project-type is not 'python'."
+              exit 1
+            fi
+            if [[ "${{ inputs.publish-to-pypi }}" == "true" ]]; then
+              echo "::error::publish-to-pypi must not be true when project-type is not 'python'."
+              exit 1
+            fi
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # required to see tags and commits
           ref: ${{ github.sha }}  # lock to triggered commit ('github.ref' is dynamic)
 
-      - uses: actions/setup-python@v5  # needed for building project
+      # PYTHON ONLY: setup python
+      - if: inputs.project-type == 'python'
+        uses: actions/setup-python@v5  # needed for building Python project
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -57,16 +93,21 @@ jobs:
           git tag v${{ steps.next-version.outputs.version }}  # note: prepend 'v'
           git push origin --tags
 
-      - if: steps.next-version.outputs.version != ''
+      # PYTHON ONLY: auto-build
+      - if: |
+          steps.next-version.outputs.version != '' &&
+          inputs.project-type == 'python'
         name: Build Python package
         uses: WIPACrepo/wipac-dev-py-build-action@v1.1
         # -> uses the most recent git tag for versioning (aka the one made above)
         # -> creates 'dist/' files
 
-      - if: steps.next-version.outputs.version != '' && inputs.release-artifacts != ''
+      - if: |
+          steps.next-version.outputs.version != '' && 
+          inputs.release-artifacts != ''
         name: Download extra artifacts
         env:
-          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           echo "${{ inputs.release-artifacts }}" | while read -r name; do
@@ -85,8 +126,13 @@ jobs:
           files: |
             dist/*
             release-artifacts/**/*
+          # note: OK if a file/glob does not exist (above)
 
-      - if: steps.next-version.outputs.version != '' && inputs.publish-to-pypi == true
+      # PYTHON ONLY: publish to PyPI if explicitly requested
+      - if: |
+          steps.next-version.outputs.version != '' &&
+          inputs.project-type == 'python' &&
+          inputs.publish-to-pypi == true
         name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
