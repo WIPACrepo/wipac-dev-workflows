@@ -406,7 +406,7 @@ jobs:
     ]
     runs-on: ubuntu-latest
     steps:
-      - name: Download digests
+      - name: Download platform digests
         if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
         uses: actions/download-artifact@v4
         with:
