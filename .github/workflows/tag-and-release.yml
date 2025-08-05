@@ -64,13 +64,17 @@ jobs:
           git push origin --tags
 
       # PYTHON ONLY: auto-build
-      - if: inputs.project-type == 'python' && steps.next-version.outputs.version != ''
+      - if: |
+          steps.next-version.outputs.version != '' &&
+          inputs.project-type == 'python'
         name: Build Python package
         uses: WIPACrepo/wipac-dev-py-build-action@v1.1
         # -> uses the most recent git tag for versioning (aka the one made above)
         # -> creates 'dist/' files
 
-      - if: steps.next-version.outputs.version != '' && inputs.release-artifacts != ''
+      - if: |
+          steps.next-version.outputs.version != '' && 
+          inputs.release-artifacts != ''
         name: Download extra artifacts
         env:
           GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -92,9 +96,13 @@ jobs:
           files: |
             dist/*
             release-artifacts/**/*
+          # note: OK if a file/glob does not exist (above)
 
       # PYTHON ONLY: publish to PyPI if explicitly requested
-      - if: inputs.project-type == 'python' && steps.next-version.outputs.version != '' && inputs.publish-to-pypi == true
+      - if: |
+          steps.next-version.outputs.version != '' &&
+          inputs.project-type == 'python' &&
+          inputs.publish-to-pypi == true
         name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
