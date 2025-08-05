@@ -30,10 +30,9 @@ This GitHub Actions **reusable workflow** performs tagging and releasing of a pr
 
 ## Secrets
 
-| Name                    | Required                                                | Description                                                    |
-|-------------------------|---------------------------------------------------------|----------------------------------------------------------------|
-| `PERSONAL_ACCESS_TOKEN` | ✅ Always                                                | GitHub token for authenticating CLI and downloading artifacts. |
-| `PYPI_TOKEN`            | ✅ if `publish-to-pypi` and `project-type` is `'python'` | API token for uploading the package to PyPI.                   |
+| Name         | Required                                                | Description                                  |
+|--------------|---------------------------------------------------------|----------------------------------------------|
+| `PYPI_TOKEN` | ✅ if `publish-to-pypi` and `project-type` is `'python'` | API token for uploading the package to PyPI. |
 
 ---
 
@@ -58,7 +57,6 @@ jobs:
         py-dependencies-logs
       publish-to-pypi: true
     secrets:
-      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
 ```
 
@@ -79,6 +77,4 @@ jobs:
       release-artifacts: |
         build-logs
         compiled-rust-proj
-    secrets:
-      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 ```

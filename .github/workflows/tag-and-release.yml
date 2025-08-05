@@ -25,8 +25,6 @@ on:
     secrets:
       PYPI_TOKEN:
         required: false  # only required if 'publish-to-pypi' is true
-      PERSONAL_ACCESS_TOKEN:
-        required: true
 
 jobs:
   tag-and-release:
@@ -102,8 +100,6 @@ jobs:
           steps.next-version.outputs.version != '' && 
           inputs.release-artifacts != ''
         name: Download extra artifacts
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           echo "${{ inputs.release-artifacts }}" | while read -r name; do
