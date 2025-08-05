@@ -355,7 +355,7 @@ jobs:
 
           # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
           images_w_sha=""
-          for f in digests/*.txt; do
+          for f in platform-digests/*.txt; do
             ref=$(cat "$f")
             echo "$ref"  # for logging
             images_w_sha="$images_w_sha $ref"
