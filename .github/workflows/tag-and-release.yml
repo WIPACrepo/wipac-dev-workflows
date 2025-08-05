@@ -34,6 +34,12 @@ jobs:
       - name: Validate inputs
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          # Check that project-type is only lowercase letters
+          if [[ ! "${{ inputs.project-type }}" =~ ^[a-z]+$ ]]; then
+            echo "::error::project-type must be only lowercase letters (a-z)."
+            exit 1
+          fi
 
           # PROJECT IS PYTHON
           if [[ "${{ inputs.project-type }}" == "python" ]]; then
