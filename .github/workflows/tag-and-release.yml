@@ -1,11 +1,15 @@
-name: Tag, Build, and Release of a Python package; Optionally, Publish to PyPI
+name: "Tag and Release Project; Optionally: Build Python Package, Publish to PyPI"
 
 on:
   workflow_call:
     inputs:
-      python-version:
-        description: "Python version to use for build"
+      project-type:
+        description: "Project type (only 'python' triggers an automatic build here)"
         required: true
+        type: string
+      python-version:
+        description: "Python version to use for build (only if project-type is 'python')"
+        required: false
         type: string
       release-artifacts:
         description: |
@@ -14,7 +18,7 @@ on:
         required: false
         type: string
       publish-to-pypi:
-        description: "If true, publish built package to PyPI"
+        description: "If true and project-type is 'python', publish built package to PyPI"
         required: false
         type: boolean
         default: false
@@ -34,7 +38,9 @@ jobs:
           fetch-depth: 0  # required to see tags and commits
           ref: ${{ github.sha }}  # lock to triggered commit ('github.ref' is dynamic)
 
-      - uses: actions/setup-python@v5  # needed for building project
+      # PYTHON ONLY: setup python
+      - if: inputs.project-type == 'python'
+        uses: actions/setup-python@v5  # needed for building Python project
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -57,7 +63,8 @@ jobs:
           git tag v${{ steps.next-version.outputs.version }}  # note: prepend 'v'
           git push origin --tags
 
-      - if: steps.next-version.outputs.version != ''
+      # PYTHON ONLY: auto-build
+      - if: inputs.project-type == 'python' && steps.next-version.outputs.version != ''
         name: Build Python package
         uses: WIPACrepo/wipac-dev-py-build-action@v1.1
         # -> uses the most recent git tag for versioning (aka the one made above)
@@ -86,7 +93,8 @@ jobs:
             dist/*
             release-artifacts/**/*
 
-      - if: steps.next-version.outputs.version != '' && inputs.publish-to-pypi == true
+      # PYTHON ONLY: publish to PyPI if explicitly requested
+      - if: inputs.project-type == 'python' && steps.next-version.outputs.version != '' && inputs.publish-to-pypi == true
         name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
