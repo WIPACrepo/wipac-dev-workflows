@@ -33,6 +33,32 @@ jobs:
     runs-on: ubuntu-latest
     concurrency: tag-and-release  # prevent any possible race conditions
     steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          # PROJECT IS PYTHON
+          if [[ "${{ inputs.project-type }}" == "python" ]]; then
+            if [[ -z "${{ inputs.python-version }}" ]]; then
+              echo "::error::python-version is required when project-type is 'python'."
+              exit 1
+            fi
+            if [[ "${{ inputs.publish-to-pypi }}" == "true" && -z "${{ secrets.PYPI_TOKEN }}" ]]; then
+              echo "::error::PYPI_TOKEN secret must be set when publish-to-pypi is true for Python projects."
+              exit 1
+            fi
+          # PROJECT IS *NOT* PYTHON
+          else
+            if [[ -n "${{ inputs.python-version }}" ]]; then
+              echo "::error::python-version must not be set when project-type is not 'python'."
+              exit 1
+            fi
+            if [[ "${{ inputs.publish-to-pypi }}" == "true" ]]; then
+              echo "::error::publish-to-pypi must not be true when project-type is not 'python'."
+              exit 1
+            fi
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # required to see tags and commits
