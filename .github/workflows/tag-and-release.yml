@@ -100,6 +100,8 @@ jobs:
           steps.next-version.outputs.version != '' && 
           inputs.release-artifacts != ''
         name: Download extra artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           echo "${{ inputs.release-artifacts }}" | while read -r name; do
