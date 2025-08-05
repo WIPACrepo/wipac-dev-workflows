@@ -8,7 +8,7 @@ on:
           The target image's container registry hostname (no namespace).
           Examples: ghcr.io, docker.io, harbor.icecube.aq
         type: string
-        required: true
+        default: ghcr.io
       image_namespace:
         description: |
           The target image's namespace or project path in the registry (can include slashes).

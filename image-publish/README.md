@@ -4,14 +4,14 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitH
 
 ## Inputs
 
-### Required
+### Basic Inputs
 
-| Name              | Description                                                                                                                                                                                                                                                           |
-|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `image_registry`  | The target image's container registry hostname (no namespace).<br>Examples: `ghcr.io`, `docker.io`, `harbor.icecube.aq`                                                                                                                                               |
-| `image_namespace` | The target image's namespace or project path in the registry (may include `/`).<br>Examples: `foo`, `foo/bar`, `myproject`                                                                                                                                            |
-| `image_name`      | The target image's name (only the name – no registry, no namespace, no tag, no digest).<br>Examples: `myimage`, `scanner`                                                                                                                                             |
-| `mode`            | What to do:<br>- `BUILD` – Build and publish Docker image on registry<br>- `CVMFS_BUILD` – `BUILD`, then request CVMFS to build/persist it<br>- `CVMFS_REMOVE` – Remove Singularity image(s) from CVMFS<br>- `CVMFS_REMOVE_THEN_BUILD` – Remove then rebuild on CVMFS |
+| Name              | Required (Default) | Description                                                                                                                                                                                                                                                           |
+|-------------------|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `image_registry`  | no (`ghcr.io`)     | The target image's container registry hostname (no namespace).<br>Examples: `ghcr.io`, `docker.io`, `harbor.icecube.aq`                                                                                                                                               |
+| `image_namespace` | ✅                  | The target image's namespace or project path in the registry (may include `/`).<br>Examples: `foo`, `foo/bar`, `myproject`                                                                                                                                            |
+| `image_name`      | ✅                  | The target image's name (only the name – no registry, no namespace, no tag, no digest).<br>Examples: `myimage`, `scanner`                                                                                                                                             |
+| `mode`            | ✅                  | What to do:<br>- `BUILD` – Build and publish Docker image on registry<br>- `CVMFS_BUILD` – `BUILD`, then request CVMFS to build/persist it<br>- `CVMFS_REMOVE` – Remove Singularity image(s) from CVMFS<br>- `CVMFS_REMOVE_THEN_BUILD` – Remove then rebuild on CVMFS |
 
 #### Mode Reference
 
@@ -22,7 +22,7 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitH
 | `CVMFS_REMOVE`            | ✅            |                      |                     |
 | `CVMFS_REMOVE_THEN_BUILD` | ✅ (1st)      | ✅ (2nd)              | ✅ (3rd)             |
 
-### Optional
+### Additional Inputs
 
 > NOTE:
 >
