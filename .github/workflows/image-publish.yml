@@ -350,16 +350,16 @@ jobs:
           images: |
             ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           tags: |
-            # ALWAYS: make a tag for the branch name
-            #   example: main
-            #   example: foo
-            type=ref,event=branch
-            
             # IF OVERRIDING TAG: using 'publish_tag_override'\
             #   example: dev
             type=raw,value=${{ inputs.publish_tag_override }},enable=${{ inputs.publish_tag_override != '' }}
             
             # RUNNING ON: branch
+            # -> verbatim branch name
+            #   example: main
+            #   example: foo
+            type=ref,event=branch
+            # -> SHA suffix
             #   example: main-1a2b3c
             #   example: foo-4d5e6f
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' && inputs.publish_tag_override == '' }}
