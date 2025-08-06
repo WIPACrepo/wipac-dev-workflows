@@ -350,7 +350,7 @@ jobs:
           images: |
             ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           tags: |
-            # IF OVERRIDING TAG: using 'extra_build_tag'\
+            # CUSTOM TAG: using 'extra_build_tag'\
             #   example: dev
             type=raw,value=${{ inputs.extra_build_tag }},enable=${{ inputs.extra_build_tag != '' }}
             
