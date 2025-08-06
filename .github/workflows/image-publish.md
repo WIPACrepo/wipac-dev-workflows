@@ -39,11 +39,11 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitH
 
 #### Miscellaneous Build Configuration
 
-| Name                   | Required | Description                                                                                                                                                                                                                                                  |
-|------------------------|----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `free_disk_space`      | no       | `true` to make space on GitHub runner before building image                                                                                                                                                                                                  |
-| `build_platforms_csv`  | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64`                                                                                                                                                                         |
-| `publish_tag_override` | no       | Use this tag **instead of auto-generated tags**.<br>Useful with `workflow_dispatch` to override tags like `dev`, `test`, or `unstable`. Example: `build_tag_override: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.my_tag \|\| '' }}` |
+| Name                  | Required | Description                                                                                                                                                                                                                                                |
+|-----------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `free_disk_space`     | no       | `true` to make space on GitHub runner before building image                                                                                                                                                                                                |
+| `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64`                                                                                                                                                                       |
+| `extra_build_tag`     | no       | Use this custom tag **in addition** to auto-generated tags.<br>Useful with `workflow_dispatch` to override static tags like `dev`, `test`, or `unstable`. Example: `${{ github.event_name == 'workflow_dispatch' && github.event.inputs.my_tag \|\| '' }}` |
 
 ## Secrets
 
