@@ -209,6 +209,7 @@ jobs:
             echo '```'
             echo "${{ inputs.cvmfs_remove_tags }}"
             echo '```'
+            echo "- \`publish_tag_override\` = ${{ inputs.publish_tag_override || 'null' }}"
             echo ""
           
             [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "### 📋 Build Config"
