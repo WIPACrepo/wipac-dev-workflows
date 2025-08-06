@@ -84,7 +84,6 @@ on:
           IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
             The token/password needed for publishing the image to a container registry.
           EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
-          EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
         required: false
       cvmfs_github_token:
         description: |

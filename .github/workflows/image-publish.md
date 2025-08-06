@@ -49,18 +49,12 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitH
 
 Depending on the `mode`, secret(s) may be required:
 
-#### If using DockerHub
+### Container Registry Authentication
 
-| Name                | Required                      | Description         |
-|---------------------|-------------------------------|---------------------|
-| `registry_username` | ✅, if building for Docker Hub | Docker Hub username |
-| `registry_token`    | ✅, if building for Docker Hub | Docker Hub token    |
-
-#### If using the GitHub Container Registry (ghcr.io)
-
-| Name             | Required                     | Description                                    |
-|------------------|------------------------------|------------------------------------------------|
-| `registry_token` | ✅, if building for `ghcr.io` | GitHub token for authenticating with `ghcr.io` |
+| Name                | Required                                        | Description                                | Notes                                                                                                                |
+|---------------------|-------------------------------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `registry_username` | ✅, if registry requires authentication username | Username for the container registry.       | Ignored for `ghcr.io` (uses `${{ github.actor }}`).                                                                  |
+| `registry_token`    | ✅, if registry requires authentication          | Token/password for the container registry. | Not needed for `ghcr.io` (defaults to `${{ secrets.GITHUB_TOKEN }}`), unless publishing to a third-party repository. |
 
 #### If interacting with CVMFS
 
@@ -93,7 +87,7 @@ jobs:
       registry_token: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
 
-Build for ghcr.io + CVMFS:
+Build for `ghcr.io` + CVMFS:
 
 ```yaml
 jobs:
@@ -109,7 +103,6 @@ jobs:
       mode: CVMFS_BUILD
       cvmfs_dest_dir: myorg
     secrets:
-      registry_token: ${{ secrets.GITHUB_TOKEN }}
       cvmfs_github_token: ${{ secrets.CVMFS_PAT }}
 ```
 
