@@ -274,7 +274,7 @@ jobs:
           username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
           password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
 
-      # VERY BASIC METADATA - tagging occurs in 'tag-published-images' (job)
+      # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
         uses: docker/metadata-action@v5
         with:
@@ -318,7 +318,7 @@ jobs:
           retention-days: 1
 
 
-  tag-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
+  tag-and-merge-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
     if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
     needs: [
       gameplan,
@@ -369,8 +369,6 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' && inputs.publish_tag_override == '' }}
             type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' && inputs.publish_tag_override == '' }}
 
-
-
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
       - name: Create and push manifest
@@ -408,7 +406,7 @@ jobs:
     needs: [
       gameplan,
       remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
-      tag-published-images,  # needed for retrieving images
+      tag-and-merge-published-images,  # needed for retrieving images
     ]
     runs-on: ubuntu-latest
     steps:
@@ -416,7 +414,7 @@ jobs:
         with:
           github_token: ${{ secrets.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
-          build_images: ${{ needs.tag-published-images.outputs.tags }}
+          build_images: ${{ needs.tag-and-merge-published-images.outputs.tags }}
 
   final-summary:
     if: always()
@@ -425,7 +423,7 @@ jobs:
       gameplan,
       remove-from-cvmfs,
       build-w-platform-and-publish-by-sha,
-      tag-published-images,
+      tag-and-merge-published-images,
       build-on-cvmfs,
     ]
     runs-on: ubuntu-latest
@@ -452,7 +450,7 @@ jobs:
             if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
               echo "## 🔢 Tags Published"
               echo '```'
-              echo "${{ needs.tag-published-images.outputs.tags }}"
+              echo "${{ needs.tag-and-merge-published-images.outputs.tags }}"
               echo '```'
               echo ""
               echo "## 🔍 Platform Digests"
