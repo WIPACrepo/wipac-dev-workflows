@@ -60,6 +60,17 @@ on:
         required: false
         type: string
         default: "linux/amd64,linux/arm64"
+      publish_tag_override:
+        description: |
+          IF BUILDING IMAGE (else, var is ignored):
+            If provided, use this tag instead of auto-creating tags based on GHA trigger event.
+          NOTE: this is useful in combination with a manual 'workflow_dispatch' to
+            override constant tags, ex: 'dev', 'test', 'unstable', etc.
+          EXAMPLE: 'build_tag_override: $ {{ github.event_name == 'workflow_dispatch' && github.event.inputs.my_tag || '' }}' (no space after $)
+        required: false
+        type: string
+        default: ""
+
     secrets:
       registry_username:
         description: |
@@ -340,12 +351,27 @@ jobs:
           images: |
             ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           tags: |
-            # running on: branch
-            type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
-            # running on: new tag
-            type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
-            type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+            # ALWAYS: make a tag for the branch name
+            #   example: main
+            #   example: foo
+            type=ref,event=branch
+            
+            # IF OVERRIDING TAG: using 'publish_tag_override'\
+            #   example: dev
+            type=raw,value=${{ inputs.publish_tag_override }},enable=${{ inputs.publish_tag_override != '' }}
+            
+            # RUNNING ON: branch
+            #   example: main-1a2b3c
+            #   example: foo-4d5e6f
+            type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' && inputs.publish_tag_override == '' }}
+            
+            # RUNNING ON: new tag
+            #   example: v1 + v1.2 + v1.2.3 
+            type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' && inputs.publish_tag_override == '' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' && inputs.publish_tag_override == '' }}
+            type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' && inputs.publish_tag_override == '' }}
+
+
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
