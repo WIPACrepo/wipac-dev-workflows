@@ -39,27 +39,22 @@ This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitH
 
 #### Miscellaneous Build Configuration
 
-| Name                  | Required | Description                                                                          |
-|-----------------------|----------|--------------------------------------------------------------------------------------|
-| `free_disk_space`     | no       | `true` to make space on GitHub runner before building image                          |
-| `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64` |
+| Name                  | Required | Description                                                                                                                                                                                                                                                |
+|-----------------------|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `free_disk_space`     | no       | `true` to make space on GitHub runner before building image                                                                                                                                                                                                |
+| `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64`                                                                                                                                                                       |
+| `extra_build_tag`     | no       | Use this custom tag **in addition** to auto-generated tags.<br>Useful with `workflow_dispatch` to override static tags like `dev`, `test`, or `unstable`. Example: `${{ github.event_name == 'workflow_dispatch' && github.event.inputs.my_tag \|\| '' }}` |
 
 ## Secrets
 
 Depending on the `mode`, secret(s) may be required:
 
-#### If using DockerHub
+### Container Registry Authentication
 
-| Name                | Required                      | Description         |
-|---------------------|-------------------------------|---------------------|
-| `registry_username` | ✅, if building for Docker Hub | Docker Hub username |
-| `registry_token`    | ✅, if building for Docker Hub | Docker Hub token    |
-
-#### If using the GitHub Container Registry (ghcr.io)
-
-| Name             | Required                     | Description                                    |
-|------------------|------------------------------|------------------------------------------------|
-| `registry_token` | ✅, if building for `ghcr.io` | GitHub token for authenticating with `ghcr.io` |
+| Name                | Required                                        | Description                                | Notes                                                                                                                |
+|---------------------|-------------------------------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `registry_username` | ✅, if registry requires authentication username | Username for the container registry.       | Ignored for `ghcr.io` (uses `${{ github.actor }}`).                                                                  |
+| `registry_token`    | ✅, if registry requires authentication          | Token/password for the container registry. | Not needed for `ghcr.io` (defaults to `${{ secrets.GITHUB_TOKEN }}`), unless publishing to a third-party repository. |
 
 #### If interacting with CVMFS
 
@@ -92,7 +87,7 @@ jobs:
       registry_token: ${{ secrets.DOCKERHUB_TOKEN }}
 ```
 
-Build for ghcr.io + CVMFS:
+Build for `ghcr.io` + CVMFS:
 
 ```yaml
 jobs:
@@ -108,7 +103,6 @@ jobs:
       mode: CVMFS_BUILD
       cvmfs_dest_dir: myorg
     secrets:
-      registry_token: ${{ secrets.GITHUB_TOKEN }}
       cvmfs_github_token: ${{ secrets.CVMFS_PAT }}
 ```
 

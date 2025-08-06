@@ -60,6 +60,17 @@ on:
         required: false
         type: string
         default: "linux/amd64,linux/arm64"
+      extra_build_tag:
+        description: |
+          IF BUILDING IMAGE (else, var is ignored):
+            If provided, use this tag in addition to the normally automatically generated tags based on GHA trigger event.
+          NOTE: this is useful in combination with a manual 'workflow_dispatch' to
+            overwrite static tags, ex: 'dev', 'test', 'unstable', etc.
+          EXAMPLE: '$ {{ github.event_name == 'workflow_dispatch' && github.event.inputs.my_tag || '' }}' (no space after $)
+        required: false
+        type: string
+        default: ""
+
     secrets:
       registry_username:
         description: |
@@ -73,7 +84,6 @@ on:
           IF USING PUBLISHING TO A CONTAINER REGISTRY (else, var is ignored):
             The token/password needed for publishing the image to a container registry.
           EXAMPLE: use $ {{ secrets.DOCKERHUB_TOKEN }} (no space after $)
-          EXAMPLE: use $ {{ secrets.GITHUB_TOKEN }} (no space after $)
         required: false
       cvmfs_github_token:
         description: |
@@ -199,6 +209,7 @@ jobs:
             echo '```'
             echo "${{ inputs.cvmfs_remove_tags }}"
             echo '```'
+            echo "- \`extra_build_tag\` = ${{ inputs.extra_build_tag || 'null' }}"
             echo ""
           
             [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "### 📋 Build Config"
@@ -251,7 +262,6 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.gameplan.outputs.build-platform-matrix) }}
     runs-on: ${{ matrix.runner }}
-    name: Build+publish image (${{ matrix.platform }})
     steps:
       - uses: actions/checkout@v4
         with:
@@ -265,7 +275,7 @@ jobs:
           username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
           password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
 
-      # VERY BASIC METADATA - tagging occurs in 'tag-published-images' (job)
+      # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
         uses: docker/metadata-action@v5
         with:
@@ -309,7 +319,7 @@ jobs:
           retention-days: 1
 
 
-  tag-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
+  tag-and-merge-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
     if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
     needs: [
       gameplan,
@@ -340,9 +350,22 @@ jobs:
           images: |
             ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           tags: |
-            # running on: branch
+            # CUSTOM TAG: using 'extra_build_tag'\
+            #   example: dev
+            type=raw,value=${{ inputs.extra_build_tag }},enable=${{ inputs.extra_build_tag != '' }}
+            
+            # RUNNING ON: branch
+            # -> verbatim branch name
+            #   example: main
+            #   example: foo
+            type=ref,event=branch
+            # -> SHA suffix
+            #   example: main-1a2b3c
+            #   example: foo-4d5e6f
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
-            # running on: new tag
+            
+            # RUNNING ON: new tag
+            #   example: v1 + v1.2 + v1.2.3 
             type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
@@ -384,7 +407,7 @@ jobs:
     needs: [
       gameplan,
       remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
-      tag-published-images,  # needed for retrieving images
+      tag-and-merge-published-images,  # needed for retrieving images
     ]
     runs-on: ubuntu-latest
     steps:
@@ -392,7 +415,7 @@ jobs:
         with:
           github_token: ${{ secrets.cvmfs_github_token }}
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
-          build_images: ${{ needs.tag-published-images.outputs.tags }}
+          build_images: ${{ needs.tag-and-merge-published-images.outputs.tags }}
 
   final-summary:
     if: always()
@@ -401,7 +424,7 @@ jobs:
       gameplan,
       remove-from-cvmfs,
       build-w-platform-and-publish-by-sha,
-      tag-published-images,
+      tag-and-merge-published-images,
       build-on-cvmfs,
     ]
     runs-on: ubuntu-latest
@@ -428,7 +451,7 @@ jobs:
             if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
               echo "## 🔢 Tags Published"
               echo '```'
-              echo "${{ needs.tag-published-images.outputs.tags }}"
+              echo "${{ needs.tag-and-merge-published-images.outputs.tags }}"
               echo '```'
               echo ""
               echo "## 🔍 Platform Digests"
