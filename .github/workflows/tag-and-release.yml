@@ -23,6 +23,8 @@ on:
         type: boolean
         default: false
     secrets:
+      REPO_PAT:
+        required: false  # only required if you want to trigger workflows from the 'git tag'
       PYPI_TOKEN:
         required: false  # only required if 'publish-to-pypi' is true
 
@@ -88,10 +90,13 @@ jobs:
 
       - if: steps.next-version.outputs.version != ''
         name: Tag new version
+        env:
+          AUTH_TOKEN: ${{ secrets.REPO_PAT || github.token }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          echo "::add-mask::${AUTH_TOKEN}"  # logging safety
           git tag v${{ steps.next-version.outputs.version }}  # note: prepend 'v'
-          git push origin --tags
+          git push https://x-access-token:${AUTH_TOKEN}@github.com/${{ github.repository }} --tags
 
       # PYTHON ONLY: auto-build
       - if: |

@@ -30,9 +30,10 @@ This GitHub Actions **reusable workflow** performs tagging and releasing of a pr
 
 ## Secrets
 
-| Name         | Required                                                | Description                                  |
-|--------------|---------------------------------------------------------|----------------------------------------------|
-| `PYPI_TOKEN` | ✅ if `publish-to-pypi` and `project-type` is `'python'` | API token for uploading the package to PyPI. |
+| Name         | When to Use                                                   | Description                                  |
+|--------------|---------------------------------------------------------------|----------------------------------------------|
+| `REPO_PAT`   | if you want to trigger GHA workflows from the `git tag` event | A token for the repo that can push tags.     
+| `PYPI_TOKEN` | if `publish-to-pypi` and `project-type` is `'python'`         | API token for uploading the package to PyPI. |
 
 ---
 
@@ -62,6 +63,7 @@ jobs:
         py-dependencies-logs
       publish-to-pypi: true
     secrets:
+      REPO_PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # trigger tag-event gha workflows
       PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
 ```
 
