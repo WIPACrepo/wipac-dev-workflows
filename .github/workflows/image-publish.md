@@ -68,6 +68,23 @@ Here are a few examples, out of many possible configurations.
 
 ### Static/Single Mode
 
+Build for `ghcr.io` only:
+
+```yaml
+jobs:
+
+  ...
+
+  image-publish:
+    uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
+    permissions: # for GITHUB_TOKEN
+      packages: write
+    with:
+      image_namespace: myorg
+      image_name: myrepo
+      mode: BUILD
+```
+
 Build for Docker Hub only:
 
 ```yaml
@@ -96,6 +113,8 @@ jobs:
 
   image-publish:
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
+    permissions: # for GITHUB_TOKEN
+      packages: write
     with:
       image_registry: ghcr.io
       image_namespace: myorg
@@ -153,6 +172,8 @@ jobs:
   image-publish:
     needs: [ determine-mode, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
+    permissions: # for GITHUB_TOKEN
+      packages: write
     with:
       image_registry: ghcr.io
       image_namespace: myorg

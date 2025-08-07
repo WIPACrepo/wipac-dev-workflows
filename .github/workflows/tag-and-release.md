@@ -50,6 +50,8 @@ jobs:
     if: format('refs/heads/{0}', github.event.repository.default_branch) == github.ref
     needs: [ ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/tag-and-release.yml@v...
+    permissions: # for GITHUB_TOKEN
+      contents: write
     with:
       project-type: python
       python-version: "${{ fromJSON(needs.py-versions.outputs.matrix)[0] }}"
@@ -72,6 +74,8 @@ jobs:
     if: format('refs/heads/{0}', github.event.repository.default_branch) == github.ref
     needs: [ build-job ] # where your project was built and artifacts were uploaded
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/tag-and-release.yml@v...
+    permissions: # for GITHUB_TOKEN
+      contents: write
     with:
       project-type: rust
       release-artifacts: |
