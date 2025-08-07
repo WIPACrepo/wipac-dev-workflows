@@ -43,12 +43,15 @@ This GitHub Actions **reusable workflow** performs tagging and releasing of a pr
 ```yaml
 jobs:
 
+  py-versions: # see WIPACrepo/wipac-dev-py-versions-action
+    ...
+
   ...
 
   tag-and-release:
     # only run on main/default branch
     if: format('refs/heads/{0}', github.event.repository.default_branch) == github.ref
-    needs: [ ... ]
+    needs: [ py-versions, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/tag-and-release.yml@v...
     permissions: # for GITHUB_TOKEN
       contents: write
