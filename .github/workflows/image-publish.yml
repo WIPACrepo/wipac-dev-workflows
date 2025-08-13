@@ -94,6 +94,7 @@ on:
 
 jobs:
   gameplan:
+    # this sets outputs that decide which actions to take in the workflow
     runs-on: ubuntu-latest
     outputs:
       do-remove-from-cvmfs: ${{ steps.set.outputs.do-remove-from-cvmfs }}
@@ -227,11 +228,16 @@ jobs:
 
 
   remove-from-cvmfs:
-    if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
+    # NOTE: no job-level `if:` here — this job should always succeed b/c build-on-cvmfs depends on it
     needs: [ gameplan ]
     runs-on: ubuntu-latest
     steps:
+      - name: "Skip Job: CVMFS removal not requested (no-op)"
+        if: needs.gameplan.outputs.do-remove-from-cvmfs != 'true'
+        run: echo "Nothing to remove."
+
       - name: Generate CVMFS image nametags to remove
+        if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
         id: gen
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
@@ -248,6 +254,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Request CVMFS removal
+        if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
         uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
           github_token: ${{ secrets.cvmfs_github_token }}
@@ -320,7 +327,8 @@ jobs:
           retention-days: 1
 
 
-  tag-and-merge-published-images: # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
+  tag-and-merge-published-images:
+    # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
     if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
     needs: [
       gameplan,
