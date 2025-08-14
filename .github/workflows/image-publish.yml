@@ -97,42 +97,8 @@ jobs:
     # this sets outputs that decide which actions to take in the workflow
     runs-on: ubuntu-latest
     outputs:
-      do-remove-from-cvmfs: ${{ steps.set.outputs.do-remove-from-cvmfs }}
-      do-build-and-publish-image: ${{ steps.set.outputs.do-build-and-publish-image }}
-      do-build-on-cvmfs: ${{ steps.set.outputs.do-build-on-cvmfs }}
       build-platform-matrix: ${{ steps.build-platforms.outputs.matrix }}
     steps:
-      - name: Determine workflow plan
-        id: set
-        run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-
-          echo "do-remove-from-cvmfs=false" >> "$GITHUB_OUTPUT"
-          echo "do-build-and-publish-image=false" >> "$GITHUB_OUTPUT"
-          echo "do-build-on-cvmfs=false" >> "$GITHUB_OUTPUT"
-
-          case "${{ inputs.mode }}" in
-            CVMFS_REMOVE)
-              echo "do-remove-from-cvmfs=true" >> "$GITHUB_OUTPUT"
-              ;;
-            BUILD)
-              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
-              ;;
-            CVMFS_BUILD)
-              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
-              echo "do-build-on-cvmfs=true" >> "$GITHUB_OUTPUT"
-              ;;
-            CVMFS_REMOVE_THEN_BUILD)
-              echo "do-remove-from-cvmfs=true" >> "$GITHUB_OUTPUT"
-              echo "do-build-and-publish-image=true" >> "$GITHUB_OUTPUT"
-              echo "do-build-on-cvmfs=true" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "::error::Unrecognized mode: '${{ inputs.mode }}'"
-              exit 1
-              ;;
-          esac
-
       - name: Validate image format
         id: validate
         run: |
@@ -213,31 +179,58 @@ jobs:
             echo "- \`extra_build_tag\` = ${{ inputs.extra_build_tag || 'null' }}"
             echo ""
           
-            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "### 📋 Build Config"
-            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
-            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo ""
-          
+            if [[ "${{ inputs.mode }}" == "BUILD" || \
+                  "${{ inputs.mode }}" == "CVMFS_BUILD" || \
+                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              echo "### 📋 Build Config"
+              echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
+              echo ""
+            fi
+
             echo "### ⏭️ Planned Actions"
-            [[ "${{ steps.set.outputs.do-remove-from-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS image removal"
-            [[ "${{ steps.set.outputs.do-build-and-publish-image }}" == 'true' ]] && echo "- Will build & publish Docker image(s)"
-            [[ "${{ steps.set.outputs.do-build-on-cvmfs }}" == 'true' ]] && echo "- Will request CVMFS Singularity build"
+            if [[ "${{ inputs.mode }}" == "CVMFS_REMOVE" || \
+                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              echo "- Will request CVMFS image removal"
+            fi
+            if [[ "${{ inputs.mode }}" == "BUILD" || \
+                  "${{ inputs.mode }}" == "CVMFS_BUILD" || \
+                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              echo "- Will build & publish Docker image(s)"
+            fi
+            if [[ "${{ inputs.mode }}" == "CVMFS_BUILD" || \
+                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              echo "- Will request CVMFS Singularity build"
+            fi
+
             echo ""
-          
+
             echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
           } >> "$GITHUB_STEP_SUMMARY"
 
 
-  remove-from-cvmfs:
-    # NOTE: no job-level `if:` here — this job should always succeed b/c build-on-cvmfs depends on it
+  remove-from-cvmfs-maybe:
     needs: [ gameplan ]
     runs-on: ubuntu-latest
+    if: >
+      inputs.mode == 'CVMFS_REMOVE' ||
+      inputs.mode == 'CVMFS_REMOVE_THEN_BUILD' ||
+      inputs.mode == 'CVMFS_BUILD'
+    # NOTE: ^^^ job 'build-on-cvmfs' depends on this job -- so, allow job to succeed & use step-ifs
     steps:
       - name: "Skip Job: CVMFS removal not requested (no-op)"
-        if: needs.gameplan.outputs.do-remove-from-cvmfs != 'true'
-        run: echo "Nothing to remove."
+        if: inputs.mode == 'CVMFS_BUILD'
+        run: echo "Will NOT remove CVMFS image(s)"
+
+      - name: "Do Job: CVMFS removal requested"
+        if: >
+          inputs.mode == 'CVMFS_REMOVE' ||
+          inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
+        run: echo "Will remove CVMFS image(s)."
 
       - name: Generate CVMFS image nametags to remove
-        if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
+        if: >
+          inputs.mode == 'CVMFS_REMOVE' ||
+          inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         id: gen
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
@@ -246,15 +239,20 @@ jobs:
           import os
           tags = """${{ inputs.cvmfs_remove_tags }}"""
           image = "${{ inputs.image_name }}"
-          print("\\n".join(f"{image}:{t.strip()}" for t in tags.splitlines() if t.strip()))
-          ' > delete_image_nametags.txt
+          with open("delete_image_nametags.txt", "w") as f:
+              for t in tags.splitlines():
+                  if t.strip():
+                      f.write(f"{image}:{t.strip()}\n")
+          '
           
           echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
           cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Request CVMFS removal
-        if: needs.gameplan.outputs.do-remove-from-cvmfs == 'true'
+        if: >
+          inputs.mode == 'CVMFS_REMOVE' ||
+          inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         uses: WIPACrepo/build-singularity-cvmfs-action@v2.0
         with:
           github_token: ${{ secrets.cvmfs_github_token }}
@@ -263,7 +261,10 @@ jobs:
 
 
   build-w-platform-and-publish-by-sha:
-    if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+    if: >
+      inputs.mode == 'BUILD' ||
+      inputs.mode == 'CVMFS_BUILD' ||
+      inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [ gameplan ]
     strategy:
       matrix:
@@ -329,7 +330,10 @@ jobs:
 
   tag-and-merge-published-images:
     # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
-    if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+    if: >
+      inputs.mode == 'BUILD' ||
+      inputs.mode == 'CVMFS_BUILD' ||
+      inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [
       gameplan,
       build-w-platform-and-publish-by-sha, # needed b/c image(s) need to be published before tagging/merging
@@ -412,10 +416,12 @@ jobs:
 
 
   build-on-cvmfs:
-    if: needs.gameplan.outputs.do-build-on-cvmfs == 'true'
+    if: >
+      inputs.mode == 'CVMFS_BUILD' ||
+      inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [
       gameplan,
-      remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
+      remove-from-cvmfs-maybe,  # needed b/c cvmfs removals need to happen before builds
       tag-and-merge-published-images,  # needed for retrieving images
     ]
     runs-on: ubuntu-latest
@@ -480,7 +486,7 @@ jobs:
     needs: [
       # after all jobs:
       gameplan,
-      remove-from-cvmfs,
+      remove-from-cvmfs-maybe,
       build-w-platform-and-publish-by-sha,
       tag-and-merge-published-images,
       build-on-cvmfs,
@@ -488,7 +494,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download platform digests
-        if: needs.gameplan.outputs.do-build-and-publish-image == 'true'
+        if: >
+          inputs.mode == 'BUILD' ||
+          inputs.mode == 'CVMFS_BUILD' ||
+          inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         uses: actions/download-artifact@v4
         with:
           pattern: platform-digests-*
@@ -506,7 +515,7 @@ jobs:
             echo "## 📦 Image: \`${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}\`"
             echo ""
 
-            if [[ "${{ needs.gameplan.outputs.do-build-and-publish-image }}" == "true" ]]; then
+            if [[ "${{ inputs.mode }}" == "BUILD" || "${{ inputs.mode }}" == "CVMFS_BUILD" || "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               echo "## 🔢 Tags Published"
               echo '```'
               echo "${{ needs.tag-and-merge-published-images.outputs.tags }}"
@@ -521,7 +530,7 @@ jobs:
               echo ""
             fi
 
-            if [[ "${{ needs.gameplan.outputs.do-build-on-cvmfs }}" == "true" || "${{ needs.gameplan.outputs.do-remove-from-cvmfs }}" == "true" ]]; then
+            if [[ "${{ inputs.mode }}" == "CVMFS_BUILD" || "${{ inputs.mode }}" == "CVMFS_REMOVE" || "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               echo "## 📁 CVMFS"
               echo "See [docker_images.txt](https://github.com/WIPACrepo/cvmfs-actions/blob/main/docker_images.txt)"
               echo ""
