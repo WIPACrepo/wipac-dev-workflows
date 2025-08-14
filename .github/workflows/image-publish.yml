@@ -427,45 +427,43 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          pick="$(
-            python -c "
-            import re
-            import sys
-            import os
+          pick="$(python -c "
+          import re
+          import sys
+          import os
 
-            # Read newline-delimited refs from env (robust against quoting)
-            tags = [t.strip() for t in os.environ['TAGS'].splitlines() if t.strip()]
-            # Filter out 'latest' tag
-            filtered = [t for t in tags if not t.endswith(':latest')]
+          # Read newline-delimited refs from env (robust against quoting)
+          tags = [t.strip() for t in os.environ['TAGS'].splitlines() if t.strip()]
+          # Filter out 'latest' tag
+          filtered = [t for t in tags if not t.endswith(':latest')]
 
-            def tag_part(ref: str) -> str:
-                return ref.rsplit(':', 1)[-1]
+          def tag_part(ref: str) -> str:
+              return ref.rsplit(':', 1)[-1]
 
-            def first_match(rx: str):
-                # NOTE: matching only the tag part
-                pat = re.compile(rx)
-                for ref in filtered:
-                  if pat.search(tag_part(ref)):
-                    return ref
-                return None
+          def first_match(rx: str):
+              # NOTE: matching only the tag part
+              pat = re.compile(rx)
+              for ref in filtered:
+                if pat.search(tag_part(ref)):
+                  return ref
+              return None
 
-            pick = (
-                first_match(r'^[vV]?\\d+\\.\\d+\\.\\d+$')   # full semver X.Y.Z (opt. v-prefix)
-                or first_match(r'^.+-[0-9a-f]{7}$')         # branch-SHA (7-char hex)
-                or first_match(r'^[vV]?\\d+\\.\\d+$')       # X.Y (opt. v-prefix)
-                or first_match(r'^[vV]?\\d+$')              # X (opt. v-prefix)
-                or (filtered[0] if filtered else None)      # fallback
-            )
+          pick = (
+              first_match(r'^[vV]?\\d+\\.\\d+\\.\\d+$')   # full semver X.Y.Z (opt. v-prefix)
+              or first_match(r'^.+-[0-9a-f]{7}$')         # branch-SHA (7-char hex)
+              or first_match(r'^[vV]?\\d+\\.\\d+$')       # X.Y (opt. v-prefix)
+              or first_match(r'^[vV]?\\d+$')              # X (opt. v-prefix)
+              or (filtered[0] if filtered else None)      # fallback
+          )
 
-            if not pick:
-              print('::error::Could not select a tag from generated list:', file=sys.stderr)
-              for t in tags:
-                print(t, file=sys.stderr)
-              sys.exit(1)
-            else:
-              print(pick)
-            "
-          )"
+          if not pick:
+            print('::error::Could not select a tag from generated list:', file=sys.stderr)
+            for t in tags:
+              print(t, file=sys.stderr)
+            sys.exit(1)
+          else:
+            print(pick)
+          ")"
 
           echo "Selected for CVMFS: ${pick}"
           echo "tag=${pick}" >> "$GITHUB_OUTPUT"
