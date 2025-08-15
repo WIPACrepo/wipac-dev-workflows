@@ -71,6 +71,16 @@ jobs:
           ref: ${{ github.ref }}  # dont lock to sha (action needs to push)
           token: ${{ secrets.TOKEN || github.token }}
 
+      - name: Is this most recent commit?
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          git fetch &> /dev/null
+          if [[ $(git status -sb | grep behind) ]]; then
+            echo "::error::This commit is not most recent on this branch -- rest of workflow will be skipped"
+            exit 1
+          fi
+
       # PYTHON ONLY: setup python
       - if: inputs.project-type == 'python'
         uses: actions/setup-python@v5  # needed for building Python project
