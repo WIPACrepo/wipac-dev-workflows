@@ -22,6 +22,14 @@ on:
         required: false
         type: boolean
         default: false
+      version-style:
+        description: |
+          Your project's style of versioning. 
+          Example: 'X.Y.Z' (default), 'X.Y' (no patch segment)
+          FROM: https://github.com/WIPACrepo/wipac-dev-next-version-action
+        required: false
+        default: 'X.Y.Z'
+        type: string
     secrets:
       TOKEN:
         required: false  # only required if you want to trigger workflows from the 'git tag'
@@ -98,6 +106,7 @@ jobs:
             .gitignore
             dependencies-logs/**
             tests/**
+          version-style: ${{ inputs.version-style }}
 
       - if: steps.next-version.outputs.version != ''
         name: Tag new version

@@ -20,3 +20,4 @@ jobs:
       contents: write
     with:
       project-type: gha
+      version-style: 'X.Y'
