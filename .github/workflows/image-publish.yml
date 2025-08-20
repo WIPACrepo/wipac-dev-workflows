@@ -60,6 +60,17 @@ on:
         required: false
         type: string
         default: "linux/amd64,linux/arm64"
+      build_args:
+        description: |
+          IF BUILDING IMAGE (else, var is ignored):
+            Multiline string of build arguments to pass to the Docker build (format: key=value).
+            Each line is one argument.
+          EXAMPLE:
+            FOO=bar
+            BAZ=qux
+        required: false
+        type: string
+        default: ""
       extra_build_tag:
         description: |
           IF BUILDING IMAGE (else, var is ignored):
@@ -300,6 +311,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          build-args: ${{ inputs.build_args }}
           platforms: ${{ matrix.platform }}
           tags: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           labels: ${{ steps.docker_meta.outputs.labels }}
