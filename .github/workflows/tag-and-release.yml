@@ -72,8 +72,8 @@ jobs:
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           
           # Check that project-type is only lowercase letters
-          if [[ ! "${{ inputs.project-type }}" =~ ^[a-z]+$ ]]; then
-            echo "::error::project-type must be only lowercase letters (a-z)."
+          if [[ ! "${{ inputs.project-type }}" =~ ^[a-z]+(-[a-z]+)*$ ]]; then
+            echo "::error::project-type must be only lowercase letters (a-z) with optional '-' in the middle."
             exit 1
           fi
 
