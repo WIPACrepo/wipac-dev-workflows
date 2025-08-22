@@ -30,6 +30,32 @@ on:
         required: false
         default: 'X.Y.Z'
         type: string
+      ignore-paths:
+        description: |
+          Base newline-separated globs to ignore when determining the next version.
+          Default:
+            **/README.md
+            .github/**
+            .gitignore
+            dependencies-logs/**
+            tests/**
+            CHANGELOG.md
+        required: false
+        type: string
+        default: |
+          **/README.md
+          .github/**
+          .gitignore
+          dependencies-logs/**
+          tests/**
+          CHANGELOG.md
+      more-ignore-paths:
+        description: |
+          Extra newline-separated globs to append to `ignore-paths`.
+          Useful for extending without duplicating defaults.
+        required: false
+        type: string
+        default: ""
     secrets:
       TOKEN:
         required: false  # only required if you want to trigger workflows from the 'git tag'
@@ -95,17 +121,32 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
 
+      - name: Combine ignore-paths
+        id: ignore-paths-finalized
+        env:
+          BASE: ${{ inputs.ignore-paths }}
+          EXTRA: ${{ inputs.more-ignore-paths }}
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
+          python -c '
+          import os
+          
+          base = [ln.strip() for ln in os.environ["BASE"].splitlines() if ln.strip()]
+          extra = [ln.strip() for ln in os.environ["EXTRA"].splitlines() if ln.strip()]
+          
+          combined_str = "\n".join(ln for ln in base + extra)
+          
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"value={combined_str}\n")
+          '
+
       - name: Determine next version
-        uses: WIPACrepo/wipac-dev-next-version-action@v1.4
+        uses: WIPACrepo/wipac-dev-next-version-action@v1.5
         id: next-version
         with:
           force-patch-if-no-commit-token: true
-          ignore-paths: |
-            **/README.md
-            .github/**
-            .gitignore
-            dependencies-logs/**
-            tests/**
+          ignore-paths: ${{ steps.ignore-paths-finalized.outputs.value }}
           version-style: ${{ inputs.version-style }}
 
       - if: steps.next-version.outputs.version != ''

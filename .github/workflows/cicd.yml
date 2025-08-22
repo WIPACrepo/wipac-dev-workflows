@@ -19,5 +19,7 @@ jobs:
     permissions: # for GITHUB_TOKEN
       contents: write
     with:
-      project-type: gha
+      project-type: gha-workflow
       version-style: 'X.Y'
+      more-ignore-paths: |
+        !.github/workflows/**
