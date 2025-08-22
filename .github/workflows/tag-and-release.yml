@@ -80,11 +80,9 @@ on:
           .*
           */.*
           
-          # ...but force-unignore dockerignore files (root and nested, with variants)
+          # ...but force-unignore dockerignore files
           !.dockerignore
           !.dockerignore.*
-          !*/.dockerignore
-          !*/.dockerignore.*
 
       more-ignore-paths:
         description: |
