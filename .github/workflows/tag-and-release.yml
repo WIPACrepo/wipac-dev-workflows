@@ -128,19 +128,18 @@ jobs:
           EXTRA: ${{ inputs.more-ignore-paths }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          
           python -c '
-          import os, json
+          import os
           
           base = [ln.strip() for ln in os.environ["BASE"].splitlines() if ln.strip()]
           extra = [ln.strip() for ln in os.environ["EXTRA"].splitlines() if ln.strip()]
           
-          combined = base + extra
+          combined_str = "\n".join(base + extra)
           
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
             f.write("value<<EOF\n")
-            f.write(combined_str + "\n")
-            f.write("EOF\n")
+            f.write(combined_str)
+            f.write("\nEOF\n")
           '
 
       - name: Determine next version
