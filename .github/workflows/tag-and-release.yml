@@ -33,22 +33,59 @@ on:
       ignore-paths:
         description: |
           Base newline-separated globs to ignore when determining the next version.
-          Default:
-            **/README.md
-            .github/**
-            .gitignore
-            dependencies-logs/**
-            tests/**
-            CHANGELOG.md
         required: false
         type: string
         default: |
-          **/README.md
-          .github/**
-          .gitignore
-          dependencies-logs/**
-          tests/**
-          CHANGELOG.md
+          # Project meta / docs (ALL CAPS files)
+          [A-Z]*.md
+          [A-Z]*.rst
+          [A-Z]*.txt
+          LICENSE*
+          COPYING*
+          NOTICE*
+          AUTHORS*
+          CONTRIBUTORS*
+          CHANGELOG*
+          HISTORY*
+          NEWS*
+          README*
+          CONTRIBUTING*
+          CODE_OF_CONDUCT*
+          SECURITY*
+          SUPPORT*
+          
+          # Git / GitHub meta
+          .github/*
+          .gitattributes
+          .mailmap
+          .codeowners
+          .git*  # .gitignore, etc.
+          
+          # Docs, examples, notebooks
+          [Dd]ocs/*
+          [Ee]xamples*/*
+          [Rr]esources*/*
+          [Tt]utorials/*
+          [Nn]otebooks/*
+          *.ipynb
+          
+          # Tests
+          tests/*
+          test/*
+          testing/*
+          pytest.ini
+          tox.ini
+          
+          # Blanket: all hidden dotfiles and dot-dirs (root and nested)
+          .*
+          */.*
+          
+          # ...but force-unignore dockerignore files (root and nested, with variants)
+          !.dockerignore
+          !.dockerignore.*
+          !*/.dockerignore
+          !*/.dockerignore.*
+
       more-ignore-paths:
         description: |
           Extra newline-separated globs to append to `ignore-paths`.
@@ -121,25 +158,39 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
 
-      - name: Combine ignore-paths
+      - name: Finalize ignore-paths
         id: ignore-paths-finalized
         env:
           BASE: ${{ inputs.ignore-paths }}
           EXTRA: ${{ inputs.more-ignore-paths }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          
           python -c '
           import os
-          
-          base = [ln.strip() for ln in os.environ["BASE"].splitlines() if ln.strip()]
-          extra = [ln.strip() for ln in os.environ["EXTRA"].splitlines() if ln.strip()]
-          
+
+          def clean(lines: list[str]) -> list[str]:
+              out: list[str] = []
+              for raw in lines:
+                  s = raw.strip()
+                  if not s or s.startswith("#"):
+                      continue
+                  # drop simple inline comments like "pattern  # comment"
+                  if " #" in s:
+                      s = s.split(" #", 1)[0].rstrip()
+                  if s:
+                      out.append(s)
+              return out
+
+          base = clean(os.environ["BASE"].splitlines())
+          extra = clean(os.environ["EXTRA"].splitlines())
+
           combined_str = "\n".join(base + extra)
-          
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-            f.write("value<<EOF\n")
-            f.write(combined_str)
-            f.write("\nEOF\n")
+              f.write("value<<EOF\n")
+              f.write(combined_str)
+              f.write("\nEOF\n")
           '
 
       - name: Determine next version
