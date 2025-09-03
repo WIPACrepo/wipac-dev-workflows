@@ -154,24 +154,7 @@ jobs:
 
   ...
 
-  determine-mode:
-    runs-on: ubuntu-latest
-    outputs:
-      mode: ${{ steps.set.outputs.mode }}
-    steps:
-      - name: Determine mode
-        id: set
-        run: |
-          if [[ ... ]]; then
-            echo "mode=CVMFS_REMOVE_THEN_BUILD" >> "$GITHUB_OUTPUT"
-          elif [[ ... ]]; then
-            echo "mode=CVMFS_REMOVE" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=CVMFS_BUILD" >> "$GITHUB_OUTPUT"
-          fi
-
   image-publish:
-    needs: [ determine-mode, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml@v...
     permissions: # for GITHUB_TOKEN
       packages: write
@@ -179,9 +162,10 @@ jobs:
       image_registry: ghcr.io
       image_namespace: myorg
       image_name: myrepo
-      mode: ${{ needs.determine-mode.outputs.mode }}
+      mode: ${{ github.event_name == 'delete' && 'CVMFS_REMOVE' || 'CVMFS_BUILD' }}
       cvmfs_dest_dir: myorg/myrepo
-      cvmfs_remove_tags: '${{ github.ref_name }}-[SHA]'
+      # only used if mode is CVMFS_REMOVE:
+      cvmfs_remove_tags: '${{ github.event.ref }}-[SHA]'
     secrets:
       cvmfs_github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 ```
