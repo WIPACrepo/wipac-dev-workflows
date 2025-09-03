@@ -354,7 +354,7 @@ jobs:
     outputs:
       tags: ${{ steps.docker_meta.outputs.tags }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           pattern: platform-digests-*
           path: platform-digests
@@ -510,7 +510,7 @@ jobs:
           inputs.mode == 'BUILD' ||
           inputs.mode == 'CVMFS_BUILD' ||
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: platform-digests-*
           path: platform-digests
