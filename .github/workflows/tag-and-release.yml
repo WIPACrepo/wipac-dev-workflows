@@ -152,7 +152,7 @@ jobs:
 
       # PYTHON ONLY: setup python
       - if: inputs.project-type == 'python'
-        uses: actions/setup-python@v5  # needed for building Python project
+        uses: actions/setup-python@v6  # needed for building Python project
         with:
           python-version: ${{ inputs.python-version }}
 
