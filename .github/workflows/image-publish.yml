@@ -369,6 +369,8 @@ jobs:
           pattern: platform-digests-*
           path: platform-digests
           merge-multiple: true
+          repository: ${{ github.repository }}
+          run-id: ${{ github.run_id }}
 
       # LOG INTO CONTAINER REGISTRY
       - name: Docker login
@@ -591,6 +593,8 @@ jobs:
           pattern: platform-digests-*
           path: platform-digests
           merge-multiple: true
+          repository: ${{ github.repository }}
+          run-id: ${{ github.run_id }}
 
       - name: Generate Final Summary (appears in GitHub UI)
         if: always()
@@ -620,13 +624,16 @@ jobs:
               echo "### 🖥️ Per-Platform Builds"
               echo "<details><summary>Show details</summary>"
               echo
+              shopt -s nullglob
+              files=(platform-digests/*.txt)
               echo '```'
-              for f in platform-digests/*.txt; do
+              for f in "${files[@]}"; do
                 ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
                 echo "$platform → $ref"
               done
               echo '```'
+              shopt -u nullglob
               echo "</details>"
               echo ""
 
