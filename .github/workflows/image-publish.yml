@@ -443,9 +443,17 @@ jobs:
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
           # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
+          shopt -s nullglob
+          echo "debug: listing downloaded digests"
+          ls -laR platform-digests || true
           images_w_sha=""
-          for f in platform-digests/*.txt; do
-            ref=$(cat "$f")
+          files=(platform-digests/*.txt)
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No platform digest artifacts found in ./platform-digests"
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            ref="$(cat "$f")"
             echo "$ref"  # for logging
             images_w_sha="$images_w_sha $ref"
           done
