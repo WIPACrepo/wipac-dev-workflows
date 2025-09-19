@@ -468,13 +468,14 @@ jobs:
           echo "reading the merged manifest's digest to show in summary"
           max=10
           for attempt in $(seq 1 "$max"); do
-              docker buildx imagetools inspect "$first_tag" # debug
-              if digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}' 2>/dev/null)"; then
-                  break
+              docker buildx imagetools inspect "$first_tag" || true  # debug
+              digest="$(docker buildx imagetools inspect "$first_tag" 2>/dev/null | awk '/^Digest:/ {print $2; exit}')"
+              if [[ -n "$digest" ]]; then
+                break
               fi
               n_sleep=$((attempt * 5))
               echo "manifest not yet available on registry -- trying again in ${n_sleep}s"
-              sleep $n_sleep  # 5s, 10s, 15s, ...
+              sleep "$n_sleep"  # 5s, 10s, 15s, ...
           done
           if [[ -n "$digest" ]]; then
               echo "manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
