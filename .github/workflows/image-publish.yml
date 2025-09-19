@@ -409,11 +409,8 @@ jobs:
           tag_name="${GITHUB_REF_NAME}"
           if [[ "$tag_name" =~ ^v[0-9] ]]; then
             is_v_semverish=true
-            # optional: store tag without leading 'v'
-            no_v="${tag_name#v}"
           else
             is_v_semverish=false
-            no_v=""
           fi
 
           ########################################################################
@@ -422,7 +419,6 @@ jobs:
           echo "branch=${pick}"             >> "$GITHUB_OUTPUT"
           echo "shortsha=${shortsha}"       >> "$GITHUB_OUTPUT"
           echo "is_v_semverish=${is_v_semverish}" >> "$GITHUB_OUTPUT"
-          echo "tag_no_v=${no_v}"           >> "$GITHUB_OUTPUT"
 
       # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
