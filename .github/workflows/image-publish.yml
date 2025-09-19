@@ -443,10 +443,9 @@ jobs:
             #   example: main + main-1a2b3c4
             type=raw,value=${{ steps.branch_for_tag.outputs.branch }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.branch != '' }}
             type=raw,value=${{ steps.branch_for_tag.outputs.branch }}-${{ steps.branch_for_tag.outputs.shortsha }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.shortsha != '' }}
-            # -> verbatim git tag (covers non-semver tags)
+            # -> verbatim git tag (for non-semver tags)
             #   example: oct-20-prerelease, foo, etc.
-            # NOTE: the action handles duplicates, so no worries
-            type=ref,event=tag,enable=${{ github.ref_type == 'tag' }}
+            type=ref,event=tag,enable=${{ github.ref_type == 'tag' && !(startsWith(github.ref_name, 'v') && contains('0123456789', substr(github.ref_name, 1, 1))) }}
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
