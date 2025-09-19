@@ -467,7 +467,6 @@ jobs:
           digest=""
           echo "reading the merged manifest's digest to show in summary"
           max=10
-          set -x
           for attempt in $(seq 1 "$max"); do
               docker buildx imagetools inspect "$first_tag" || true  # debug, don't fail the step
               digest="$(docker buildx imagetools inspect "$first_tag" 2>/dev/null | awk '/^Digest:/ {print $2; exit}' || true)"
@@ -479,7 +478,7 @@ jobs:
               sleep "$n_sleep"  # 5s, 10s, 15s, ...
           done
           if [[ -n "$digest" ]]; then
-              echo "manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
+              echo "summary_manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
           else
               fallback="unknown — not available at time of workflow end"
               echo "::warning::Could not inspect merged manifest for $first_tag — summary will show '$fallback'"
