@@ -468,8 +468,8 @@ jobs:
           echo "reading the merged manifest's digest to show in summary"
           max=10
           for attempt in $(seq 1 "$max"); do
-              docker buildx imagetools inspect "$first_tag" || true  # debug
-              digest="$(docker buildx imagetools inspect "$first_tag" 2>/dev/null | awk '/^Digest:/ {print $2; exit}')"
+              docker buildx imagetools inspect "$first_tag" || true  # debug, don't fail the step
+              digest="$(docker buildx imagetools inspect "$first_tag" 2>/dev/null | awk '/^Digest:/ {print $2; exit}' || true)"
               if [[ -n "$digest" ]]; then
                 break
               fi
