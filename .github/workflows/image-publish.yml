@@ -179,9 +179,9 @@ jobs:
             echo ""
           
             echo "### 🧩 GitHub Context"
-            echo "- Ref: \`${{ github.ref }}\`"
-            echo "- SHA: \`${{ github.sha }}\`"
-            echo "- Ref Type: \`${{ github.ref_type }}\`"
+            echo "- ref: \`${{ github.ref }}\`"
+            echo "- sha: \`${{ github.sha }}\`"
+            echo "- ref_type: \`${{ github.ref_type }}\`"
           
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}"
