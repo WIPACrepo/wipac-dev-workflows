@@ -341,6 +341,7 @@ jobs:
           
           cat "$file"
 
+      # === UPLOAD ===
       - uses: actions/upload-artifact@v4
         with:
           name: platform-digests-${{ steps.save_digest.outputs.safe_platform }}
@@ -364,13 +365,12 @@ jobs:
       tags: ${{ steps.docker_meta.outputs.tags }}
       summary_manifest_ref: ${{ steps.push_manifest.outputs.summary_manifest_ref }}
     steps:
+      # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
         with:
           pattern: platform-digests-*
           path: platform-digests
           merge-multiple: true
-          repository: ${{ github.repository }}
-          run-id: ${{ github.run_id }}
 
       # LOG INTO CONTAINER REGISTRY
       - name: Docker login
@@ -593,8 +593,6 @@ jobs:
           pattern: platform-digests-*
           path: platform-digests
           merge-multiple: true
-          repository: ${{ github.repository }}
-          run-id: ${{ github.run_id }}
 
       - name: Generate Final Summary (appears in GitHub UI)
         if: always()
