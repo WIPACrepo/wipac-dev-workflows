@@ -461,14 +461,21 @@ jobs:
           # create a single multi-platform image manifest with all tags pointing to published digests
           docker buildx imagetools create $all_tags $images_w_sha
 
-          # inspect one of the tags to get the merged manifest digest
+          # Try to read the merged manifest digest (registry may need a few seconds)
           # (first tag is fine since all tags point to the same manifest)
           first_tag="${tag_arr[0]}"
-          if digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}' 2>/dev/null)"; then
-            echo "summary_manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
+          digest=""
+          for attempt in 1 2 3 4 5; do
+              if digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}' 2>/dev/null)"; then
+                  break
+              fi
+              sleep $((attempt * 2))  # 2s, 4s, 6s, 8s, 10s
+          done
+          if [[ -n "$digest" ]]; then
+              echo "manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::Could not inspect merged manifest for $first_tag — summary will show 'unknown'"
-            echo "summary_manifest_ref=unknown" >> "$GITHUB_OUTPUT"
+              echo "::warning::Could not inspect merged manifest for $first_tag — summary will show 'unknown'"
+              echo "summary_manifest_ref=unknown" >> "$GITHUB_OUTPUT"
           fi
 
 
