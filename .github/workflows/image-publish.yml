@@ -588,11 +588,14 @@ jobs:
 
               echo "### 🖥️ Per-Platform Builds"
               echo "<details><summary>Show details</summary>"
+              echo
+              echo '```'
               for f in platform-digests/*.txt; do
                 ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
-                echo "- \`$platform\` → \`$ref\`"
+                echo "$platform → $ref"
               done
+              echo '```'
               echo "</details>"
               echo ""
 
