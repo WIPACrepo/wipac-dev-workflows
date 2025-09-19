@@ -178,8 +178,10 @@ jobs:
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
           
-            echo "# ⚡ Workflow Trigger (ref type)"
-            echo "`${{ github.ref_type }}`"
+            echo "### 🧩 GitHub Context"
+            echo "- Ref: \`${{ github.ref }}\`"
+            echo "- SHA: \`${{ github.sha }}\`"
+            echo "- Ref Type: \`${{ github.ref_type }}\`"
           
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}"
