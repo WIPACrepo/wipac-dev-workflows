@@ -372,7 +372,7 @@ jobs:
         with:
           fetch-depth: 0  # we need git tags
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
-      - name: "Tag-Pushes Only: Resolve branch name & short SHA"
+      - name: "Tag-Pushes Only: Resolve branch name, short SHA, and tag kind"
         id: branch_for_tag
         if: github.ref_type == 'tag'
         shell: bash
@@ -380,21 +380,49 @@ jobs:
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           git fetch --all --tags --prune
 
-          # Which remote branches contain this commit?
+          ########################################################################
+          # Determine branch name(s) containing this commit
+          ########################################################################
           branches="$(git for-each-ref --format='%(refname:short)' --contains "${GITHUB_SHA}" refs/remotes/origin/* | sed 's#^origin/##')"
 
           pick=""
           for b in main master develop dev; do
-              if echo "${branches}" | grep -qx "${b}"; then pick="${b}"; break; fi
+            if echo "${branches}" | grep -qx "${b}"; then
+              pick="${b}"
+              break
+            fi
           done
           if [[ -z "${pick}" && -n "${branches}" ]]; then
-              pick="$(echo "${branches}" | head -n1)"
+            pick="$(echo "${branches}" | head -n1)"
           fi
 
-          shortsha="$(git rev-parse --short=7 $GITHUB_SHA)"
+          ########################################################################
+          # Resolve short SHA for this commit
+          ########################################################################
+          shortsha="$(git rev-parse --short=7 "$GITHUB_SHA")"
 
-          echo "branch=${pick}" >> "$GITHUB_OUTPUT"
-          echo "shortsha=${shortsha}" >> "$GITHUB_OUTPUT"
+          ########################################################################
+          # Classify the git tag
+          # - v<digit>… → semver-ish (e.g. v1, v1.2, v1.2.3)
+          # - anything else → treated as a raw, non-semver tag
+          ########################################################################
+          tag_name="${GITHUB_REF_NAME}"
+          if [[ "$tag_name" =~ ^v[0-9] ]]; then
+            is_v_semverish=true
+            # optional: store tag without leading 'v'
+            no_v="${tag_name#v}"
+          else
+            is_v_semverish=false
+            no_v=""
+          fi
+
+          ########################################################################
+          # Emit outputs
+          ########################################################################
+          echo "branch=${pick}"             >> "$GITHUB_OUTPUT"
+          echo "shortsha=${shortsha}"       >> "$GITHUB_OUTPUT"
+          echo "is_v_semverish=${is_v_semverish}" >> "$GITHUB_OUTPUT"
+          echo "tag_no_v=${no_v}"           >> "$GITHUB_OUTPUT"
 
       # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
@@ -445,7 +473,7 @@ jobs:
             type=raw,value=${{ steps.branch_for_tag.outputs.branch }}-${{ steps.branch_for_tag.outputs.shortsha }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.shortsha != '' }}
             # -> verbatim git tag (for non-semver tags)
             #   example: oct-20-prerelease, foo, etc.
-            type=ref,event=tag,enable=${{ github.ref_type == 'tag' && !(startsWith(github.ref_name, 'v') && contains('0123456789', substr(github.ref_name, 1, 1))) }}
+            type=ref,event=tag,enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.is_v_semverish != 'true' }}
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
