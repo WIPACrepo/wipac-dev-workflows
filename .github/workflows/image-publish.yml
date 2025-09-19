@@ -365,23 +365,8 @@ jobs:
       tags: ${{ steps.docker_meta.outputs.tags }}
       summary_manifest_ref: ${{ steps.push_manifest.outputs.summary_manifest_ref }}
     steps:
-      # === DOWNLOAD ===
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: platform-digests-*
-          path: platform-digests
-          merge-multiple: true
-
-      # LOG INTO CONTAINER REGISTRY
-      - name: Docker login
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ inputs.image_registry }}
-          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
-          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
-
       # TAG-PUSHES ONLY: DETECT THE RELATED BRANCH
-      - name: "Tag-Pushes Only: Checkout"
+      - name: "Tag-Pushes Only: Checkout" # do first, so we don't overwrite any files
         if: github.ref_type == 'tag'
         uses: actions/checkout@v4
         with:
@@ -410,6 +395,21 @@ jobs:
 
           echo "branch=${pick}" >> "$GITHUB_OUTPUT"
           echo "shortsha=${shortsha}" >> "$GITHUB_OUTPUT"
+
+      # === DOWNLOAD ===
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: platform-digests-*
+          path: platform-digests
+          merge-multiple: true
+
+      # LOG INTO CONTAINER REGISTRY
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
 
       # GENERATE TAGS
       - id: docker_meta
