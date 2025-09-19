@@ -465,11 +465,11 @@ jobs:
           # (first tag is fine since all tags point to the same manifest)
           first_tag="${tag_arr[0]}"
           digest=""
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6; do
               if digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}' 2>/dev/null)"; then
                   break
               fi
-              sleep $((attempt * 2))  # 2s, 4s, 6s, 8s, 10s
+              sleep $((attempt * 5))  # 5s, 10s, 15s, 20s, 25s, 30s
           done
           if [[ -n "$digest" ]]; then
               echo "manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
