@@ -353,7 +353,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tags: ${{ steps.docker_meta.outputs.tags }}
-      manifest_ref: ${{ steps.push_manifest.outputs.manifest_ref }}
+      summary_manifest_ref: ${{ steps.push_manifest.outputs.summary_manifest_ref }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -443,14 +443,14 @@ jobs:
             echo "$ref"  # for logging
             images_w_sha="$images_w_sha $ref"
           done
-          
+
           # tags made from 'docker_meta' (step) -- from newline-delimited string
           all_tags=""
           readarray -t tag_arr <<< "${{ steps.docker_meta.outputs.tags }}"
           for tag in "${tag_arr[@]}"; do
               all_tags+=" --tag $tag"
           done
-          
+
           # validate
           if [[ -z "$all_tags" ]]; then
               echo "::error::No tags were generated to apply to the manifest."
@@ -463,9 +463,13 @@ jobs:
 
           # inspect one of the tags to get the merged manifest digest
           # (first tag is fine since all tags point to the same manifest)
-          first_tag="$(echo "${tag_arr[0]}")"
-          digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}')"
-          echo "manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
+          first_tag="${tag_arr[0]}"
+          if digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}' 2>/dev/null)"; then
+            echo "summary_manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not inspect merged manifest for $first_tag — summary will show 'unknown'"
+            echo "summary_manifest_ref=unknown" >> "$GITHUB_OUTPUT"
+          fi
 
 
   build-on-cvmfs:
@@ -569,6 +573,7 @@ jobs:
             echo ""
 
             if [[ "${{ inputs.mode }}" == "BUILD" || "${{ inputs.mode }}" == "CVMFS_BUILD" || "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+
               echo "## 🔢 Tags Published"
               echo '```'
               echo "${{ needs.tag-and-merge-published-images.outputs.tags }}"
@@ -577,17 +582,20 @@ jobs:
 
               echo "## 🔗 Image Reference"
               echo '```'
-              echo "${{ needs.tag-and-merge-published-images.outputs.manifest_ref }}"
+              echo "${{ needs.tag-and-merge-published-images.outputs.summary_manifest_ref }}"
               echo '```'
               echo ""
 
               echo "### 🖥️ Per-Platform Builds"
+              echo "<details><summary>Show details</summary>"
               for f in platform-digests/*.txt; do
                 ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
                 echo "- \`$platform\` → \`$ref\`"
               done
+              echo "</details>"
               echo ""
+
             fi
 
             if [[ "${{ inputs.mode }}" == "CVMFS_BUILD" || "${{ inputs.mode }}" == "CVMFS_REMOVE" || "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
