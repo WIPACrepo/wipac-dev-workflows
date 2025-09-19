@@ -426,6 +426,7 @@ jobs:
             # -> verbatim branch name
             #   example: main
             #   example: foo
+            # NOTE: if the branch is 'main' or 'master', an extra ':latest' tag is also created (default flavor.latest=auto)
             type=ref,event=branch
             # -> SHA suffix
             #   example: main-1a2b3c4
@@ -433,13 +434,18 @@ jobs:
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
             
             # RUNNING ON: new tag
-            #   example: v1 + v1.2 + v1.2.3 + main + main-1a2b3c4
+            # -> semver-derived tags
+            #   example: v1 + v1.2 + v1.2.3
             type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+            # -> branch-based tags
+            #   example: main + main-1a2b3c4
             type=raw,value=${{ steps.branch_for_tag.outputs.branch }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.branch != '' }}
             type=raw,value=${{ steps.branch_for_tag.outputs.branch }}-${{ steps.branch_for_tag.outputs.shortsha }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.shortsha != '' }}
-            # -- also, just in case this is a non-semver tag, use the verbatim git tag
+            # -> verbatim git tag (covers non-semver tags)
+            #   example: oct-20-prerelease, foo, etc.
+            # NOTE: the action handles duplicates, so no worries
             type=ref,event=tag,enable=${{ github.ref_type == 'tag' }}
 
       # APPLY TAGS TO IMAGE(S)
