@@ -338,6 +338,8 @@ jobs:
           file="${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
           echo "${image_at_digest}" > "$file"
           echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
+          
+          cat "$file"
 
       - uses: actions/upload-artifact@v4
         with:
