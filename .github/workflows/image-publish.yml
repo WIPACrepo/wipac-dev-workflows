@@ -334,9 +334,8 @@ jobs:
           safe_platform="${platform//\//_}"  # replace / with _
           image_at_digest="${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
 
-          file="${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
-          echo "storing '${image_at_digest}' in $file..."
-          echo "${image_at_digest}" > "$file"
+          set -x
+          echo "${image_at_digest}" > "${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
           echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
