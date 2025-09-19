@@ -353,6 +353,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tags: ${{ steps.docker_meta.outputs.tags }}
+      manifest_ref: ${{ steps.push_manifest.outputs.manifest_ref }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -431,6 +432,7 @@ jobs:
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
       - name: Create and push manifest
+        id: push_manifest
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
@@ -458,6 +460,12 @@ jobs:
           # go!
           # create a single multi-platform image manifest with all tags pointing to published digests
           docker buildx imagetools create $all_tags $images_w_sha
+
+          # inspect one of the tags to get the merged manifest digest
+          # (first tag is fine since all tags point to the same manifest)
+          first_tag="$(echo "${tag_arr[0]}")"
+          digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}')"
+          echo "manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
 
 
   build-on-cvmfs:
@@ -566,7 +574,14 @@ jobs:
               echo "${{ needs.tag-and-merge-published-images.outputs.tags }}"
               echo '```'
               echo ""
-              echo "## 🔍 Platform Digests"
+
+              echo "## 🔗 Image Reference"
+              echo '```'
+              echo "${{ needs.tag-and-merge-published-images.outputs.manifest_ref }}"
+              echo '```'
+              echo ""
+
+              echo "### 🖥️ Per-Platform Builds"
               for f in platform-digests/*.txt; do
                 ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
