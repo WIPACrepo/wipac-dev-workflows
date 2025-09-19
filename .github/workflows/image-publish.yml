@@ -468,6 +468,7 @@ jobs:
           echo "reading the merged manifest's digest to show in summary"
           max=10
           for attempt in $(seq 1 "$max"); do
+              docker buildx imagetools inspect "$first_tag" # debug
               if digest="$(docker buildx imagetools inspect "$first_tag" --format '{{ .Digest }}' 2>/dev/null)"; then
                   break
               fi
