@@ -249,9 +249,14 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           echo "${{ inputs.release-artifacts }}" | while read -r name; do
+            name="$(echo "${name}" | xargs || true)"  # strip whitespace
+            if [[ -z "${name}" ]]; then
+              continue
+            fi
             echo "Downloading artifact: $name"
             mkdir -p "release-artifacts/$name"
-            gh run download --name "$name" --dir "release-artifacts/$name" || echo "::warning::Artifact '$name' not found."
+            gh run download --name "$name" --dir "release-artifacts/$name" \
+                || echo "::warning::Artifact '$name' not found."
           done
         shell: bash
 
