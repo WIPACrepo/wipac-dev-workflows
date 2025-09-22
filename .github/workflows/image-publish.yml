@@ -178,6 +178,11 @@ jobs:
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
           
+            echo "### 🧩 GitHub Context"
+            echo "- ref: \`${{ github.ref }}\`"
+            echo "- sha: \`${{ github.sha }}\`"
+            echo "- ref_type: \`${{ github.ref_type }}\`"
+          
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}"
             echo "- \`mode\` = ${{ inputs.mode }}"
@@ -329,9 +334,14 @@ jobs:
           safe_platform="${platform//\//_}"  # replace / with _
           image_at_digest="${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@${{ steps.build.outputs.digest }}"
 
-          echo "${image_at_digest}" > "${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
+          set -x
+          file="${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
+          echo "${image_at_digest}" > "$file"
           echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
+          
+          cat "$file"
 
+      # === UPLOAD ===
       - uses: actions/upload-artifact@v4
         with:
           name: platform-digests-${{ steps.save_digest.outputs.safe_platform }}
@@ -353,7 +363,64 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tags: ${{ steps.docker_meta.outputs.tags }}
+      summary_manifest_ref: ${{ steps.push_manifest.outputs.summary_manifest_ref }}
     steps:
+      # TAG-PUSHES ONLY: DETECT THE RELATED BRANCH
+      - name: "Tag-Pushes Only: Checkout" # do first, so we don't overwrite any files
+        if: github.ref_type == 'tag'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # we need git tags
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - name: "Tag-Pushes Only: Resolve branch name, short SHA, and tag kind"
+        id: branch_for_tag
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          git fetch --all --tags --prune
+
+          ########################################################################
+          # Determine branch name(s) containing this commit
+          ########################################################################
+          branches="$(git for-each-ref --format='%(refname:short)' --contains "${GITHUB_SHA}" refs/remotes/origin/* | sed 's#^origin/##')"
+
+          pick=""
+          for b in main master develop dev; do
+            if echo "${branches}" | grep -qx "${b}"; then
+              pick="${b}"
+              break
+            fi
+          done
+          if [[ -z "${pick}" && -n "${branches}" ]]; then
+            pick="$(echo "${branches}" | head -n1)"
+          fi
+
+          ########################################################################
+          # Resolve short SHA for this commit
+          ########################################################################
+          shortsha="$(git rev-parse --short=7 "$GITHUB_SHA")"
+
+          ########################################################################
+          # Classify the git tag
+          # - v<digit>… → semver-ish (e.g. v1, v1.2, v1.2.3)
+          # - anything else → treated as a raw, non-semver tag
+          ########################################################################
+          tag_name="${GITHUB_REF_NAME}"
+          if [[ "$tag_name" =~ ^v[0-9]+(\.[0-9]+(\.[0-9]+)?)?$ ]]; then
+            is_v_semverish=true
+          else
+            is_v_semverish=false
+          fi
+
+          ########################################################################
+          # Emit outputs
+          ########################################################################
+          echo "branch=${pick}"             >> "$GITHUB_OUTPUT"
+          echo "shortsha=${shortsha}"       >> "$GITHUB_OUTPUT"
+          echo "is_v_semverish=${is_v_semverish}" >> "$GITHUB_OUTPUT"
+
+      # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
         with:
           pattern: platform-digests-*
@@ -383,39 +450,57 @@ jobs:
             # -> verbatim branch name
             #   example: main
             #   example: foo
+            # NOTE: if the branch is 'main' or 'master', an extra ':latest' tag is also created (default flavor.latest=auto)
             type=ref,event=branch
             # -> SHA suffix
-            #   example: main-1a2b3c
-            #   example: foo-4d5e6f
+            #   example: main-1a2b3c4
+            #   example: foo-4d5e6f7
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
             
             # RUNNING ON: new tag
-            #   example: v1 + v1.2 + v1.2.3 
+            # -> semver-derived tags
+            #   example: v1 + v1.2 + v1.2.3
             type=semver,pattern={{major}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}}.{{patch}},enable=${{ github.ref_type == 'tag' }}
+            # -> branch-based tags
+            #   example: main + main-1a2b3c4
+            type=raw,value=${{ steps.branch_for_tag.outputs.branch }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.branch != '' }}
+            type=raw,value=${{ steps.branch_for_tag.outputs.branch }}-${{ steps.branch_for_tag.outputs.shortsha }},enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.shortsha != '' }}
+            # -> verbatim git tag (for non-semver tags)
+            #   example: oct-20-prerelease, foo, etc.
+            type=ref,event=tag,enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.is_v_semverish != 'true' }}
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
       - name: Create and push manifest
+        id: push_manifest
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
           # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
+          shopt -s nullglob
+          echo "debug: listing downloaded digests"
+          ls -laR platform-digests || true
           images_w_sha=""
-          for f in platform-digests/*.txt; do
-            ref=$(cat "$f")
+          files=(platform-digests/*.txt)
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No platform digest artifacts found in ./platform-digests"
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            ref="$(cat "$f")"
             echo "$ref"  # for logging
             images_w_sha="$images_w_sha $ref"
           done
-          
+
           # tags made from 'docker_meta' (step) -- from newline-delimited string
           all_tags=""
           readarray -t tag_arr <<< "${{ steps.docker_meta.outputs.tags }}"
           for tag in "${tag_arr[@]}"; do
               all_tags+=" --tag $tag"
           done
-          
+
           # validate
           if [[ -z "$all_tags" ]]; then
               echo "::error::No tags were generated to apply to the manifest."
@@ -425,6 +510,30 @@ jobs:
           # go!
           # create a single multi-platform image manifest with all tags pointing to published digests
           docker buildx imagetools create $all_tags $images_w_sha
+
+          # Try to read the merged manifest digest (registry may need a few seconds)
+          # (first tag is fine since all tags point to the same manifest)
+          first_tag="${tag_arr[0]}"
+          digest=""
+          echo "reading the merged manifest's digest to show in summary"
+          max=10
+          for attempt in $(seq 1 "$max"); do
+              docker buildx imagetools inspect "$first_tag" || true  # debug, don't fail the step
+              digest="$(docker buildx imagetools inspect "$first_tag" 2>/dev/null | awk '/^Digest:/ {print $2; exit}' || true)"
+              if [[ -n "$digest" ]]; then
+                break
+              fi
+              n_sleep=$((attempt * 5))
+              echo "manifest not yet available on registry -- trying again in ${n_sleep}s"
+              sleep "$n_sleep"  # 5s, 10s, 15s, ...
+          done
+          if [[ -n "$digest" ]]; then
+              echo "summary_manifest_ref=${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}@$digest" >> "$GITHUB_OUTPUT"
+          else
+              fallback="unknown — not available at time of workflow end"
+              echo "::warning::Could not inspect merged manifest for $first_tag — summary will show '$fallback'"
+              echo "summary_manifest_ref=$fallback" >> "$GITHUB_OUTPUT"
+          fi
 
 
   build-on-cvmfs:
@@ -528,18 +637,35 @@ jobs:
             echo ""
 
             if [[ "${{ inputs.mode }}" == "BUILD" || "${{ inputs.mode }}" == "CVMFS_BUILD" || "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+
               echo "## 🔢 Tags Published"
               echo '```'
               echo "${{ needs.tag-and-merge-published-images.outputs.tags }}"
               echo '```'
               echo ""
-              echo "## 🔍 Platform Digests"
-              for f in platform-digests/*.txt; do
+
+              echo "## 🔗 Image Reference"
+              echo '```'
+              echo "${{ needs.tag-and-merge-published-images.outputs.summary_manifest_ref }}"
+              echo '```'
+              echo ""
+
+              echo "### 🖥️ Per-Platform Builds"
+              echo "<details><summary>Show details</summary>"
+              echo
+              shopt -s nullglob
+              files=(platform-digests/*.txt)
+              echo '```'
+              for f in "${files[@]}"; do
                 ref=$(cat "$f")
                 platform=$(basename "$f" .txt | tr '_' '/')
-                echo "- \`$platform\` → \`$ref\`"
+                echo "$platform → $ref"
               done
+              echo '```'
+              shopt -u nullglob
+              echo "</details>"
               echo ""
+
             fi
 
             if [[ "${{ inputs.mode }}" == "CVMFS_BUILD" || "${{ inputs.mode }}" == "CVMFS_REMOVE" || "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
