@@ -100,7 +100,9 @@ on:
 jobs:
   tag-and-release:
     runs-on: ubuntu-latest
-    concurrency: tag-and-release  # prevent any possible race conditions
+    concurrency: # prevent any possible race conditions
+      group: ${{ github.workflow }}:${{ github.repository }}:${{ github.ref }}  # branch-specific
+      cancel-in-progress: true
     steps:
       - name: Validate inputs
         run: |
@@ -134,21 +136,44 @@ jobs:
             fi
           fi
 
+      # CHECKOUT #1 — EXACT EVENT SHA (full git history for validation)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required to see tags and commits
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - name: Was this triggered by a branch push?
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          if [[ ! "${{ github.ref }}" =~ ^refs/heads/ ]]; then
+            echo "::error::This workflow only supports branch pushes (got ref='${{ github.ref }}')."
+            exit 1
+          else
+            echo "OK: Running on branch ${{ github.ref_name }}"
+            exit 0
+          fi
+      - name: Is this most recent commit?
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          # Fetch just the branch tip from origin
+          git fetch --no-tags origin "${{ github.ref_name }}" --depth=1
+          tip_sha="$(git rev-parse "origin/${{ github.ref_name }}")"
+
+          # Require the workflow's commit to be the current branch tip
+          if [[ "${tip_sha}" != "${{ github.sha }}" ]]; then
+            echo "::error::This run's commit ${{ github.sha }} is not the tip of ${{ github.ref_name }} (tip is ${tip_sha:0:7}). Skipping."
+            exit 1
+          else
+            echo "OK: ${{ github.sha }} is the current tip of ${{ github.ref_name }}."
+            exit 0
+          fi
+
+      # CHECKOUT #2 — BRANCH REF (for tag/push/release operations)
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # required to see tags and commits
           ref: ${{ github.ref }}  # dont lock to sha (action needs to push)
           token: ${{ secrets.TOKEN || github.token }}
-
-      - name: Is this most recent commit?
-        run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-
-          git fetch &> /dev/null
-          if [[ $(git status -sb | grep behind) ]]; then
-            echo "::error::This commit is not most recent on this branch -- rest of workflow will be skipped"
-            exit 1
-          fi
 
       # PYTHON ONLY: setup python
       - if: inputs.project-type == 'python'
