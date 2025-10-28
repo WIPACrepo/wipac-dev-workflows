@@ -122,27 +122,91 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
+          fail() {
+              echo "::error::$1"
+              exit 1
+          }
+
           registry="${{ inputs.image_registry }}"
           namespace="${{ inputs.image_namespace }}"
           image_name="${{ inputs.image_name }}"
 
-          # Registry: alphanum + ._- and optional :port, no slash
+          ########################################################################
+          # Basic presence + whitespace checks
+          ########################################################################
+          if [[ -z "${registry}" ]]; then
+              fail "'image_registry' must not be empty."
+          fi
+          if [[ -z "${namespace}" ]]; then
+              fail "'image_namespace' must not be empty."
+          fi
+          if [[ -z "${image_name}" ]]; then
+              fail "'image_name' must not be empty."
+          fi
+
+          if [[ "${registry}" =~ [[:space:]] ]]; then
+              fail "'image_registry' must not contain whitespace. Found: '${registry}'"
+          fi
+          if [[ "${namespace}" =~ [[:space:]] ]]; then
+              fail "'image_namespace' must not contain whitespace. Found: '${namespace}'"
+          fi
+          if [[ "${image_name}" =~ [[:space:]] ]]; then
+              fail "'image_name' must not contain whitespace. Found: '${image_name}'"
+          fi
+
+          echo "✅ Non-empty values provided, no whitespace detected."
+
+          ########################################################################
+          # Registry: lowercase alphanum + ._- and optional :port, no slash
+          ########################################################################
+          if [[ "$registry" == *"/"* ]]; then
+              fail "'image_registry' must not contain '/'. Found: '${registry}'"
+          fi
           if [[ ! "$registry" =~ ^[a-z0-9._-]+(:[0-9]+)?$ ]]; then
-            echo "::error::'registry' contains invalid characters. Found: '$registry'"
-            exit 1
+              fail "'image_registry' contains invalid characters. Found: '${registry}'"
           fi
 
-          # Namespace: may contain '/', but no tag/digest
+          echo "✅ Registry '${registry}' has valid format."
+
+          ########################################################################
+          # Namespace: may include slashes; must NOT include tag (:) or digest (@)
+          #            Each path segment: lowercase [a-z0-9._-]+; no empty segments
+          ########################################################################
           if [[ "$namespace" == *":"* ]] || [[ "$namespace" == *"@"* ]]; then
-            echo "::error::'namespace' must not include a tag or digest. Found: '$namespace'"
-            exit 1
+              fail "'image_namespace' must not include a tag or digest. Found: '${namespace}'"
+          fi
+          if [[ "$namespace" == /* ]] || [[ "$namespace" == */ ]]; then
+              fail "'image_namespace' must not start or end with '/'. Found: '${namespace}'"
+          fi
+          if [[ "$namespace" == *"//"* ]]; then
+              fail "'image_namespace' must not contain empty path segments ('//'). Found: '${namespace}'"
+          fi
+          IFS='/' read -r -a _ns_parts <<< "$namespace"
+          for seg in "${_ns_parts[@]}"; do
+              if [[ -z "$seg" ]]; then
+                  fail "'image_namespace' contains an empty path segment. Found: '${namespace}'"
+              fi
+              if [[ ! "$seg" =~ ^[a-z0-9._-]+$ ]]; then
+                  fail "'image_namespace' segment '${seg}' contains invalid characters. Allowed: [a-z0-9._-]"
+              fi
+              echo "✅ Namespace segment '${seg}' is valid."
+          done
+
+          echo "✅ Namespace '${namespace}' has valid path segments and no tag/digest."
+
+          ########################################################################
+          # Image name: lowercase alphanum + ._-, no slash
+          ########################################################################
+          if [[ "$image_name" == *"/"* ]]; then
+              fail "'image_name' must not contain '/'. Found: '${image_name}'"
+          fi
+          if [[ ! "$image_name" =~ ^[a-z0-9._-]+$ ]]; then
+              fail "'image_name' contains invalid characters. Allowed: [a-z0-9._-]. Found: '${image_name}'"
           fi
 
-          # Image name: alphanum + ._-, no slash
-          if [[ ! "$image_name" =~ ^[a-z0-9._-]+$ ]]; then
-            echo "::error::'image_name' contains invalid characters. Found: '$image_name'"
-            exit 1
-          fi
+          echo "✅ Image name '${image_name}' has valid format."
+
+          echo "🎯 All image format validations passed successfully."
 
       - name: "Validate conditional inputs"
         id: validate-conditional
@@ -174,6 +238,7 @@ jobs:
                 "${MODE}" != "CVMFS_REMOVE_THEN_BUILD" ]]; then
               fail "Invalid 'mode'='${MODE}'. Must be one of: BUILD, CVMFS_BUILD, CVMFS_REMOVE, CVMFS_REMOVE_THEN_BUILD."
           fi
+          echo "✅ Mode '${MODE}' is valid."
 
           ########################################################################
           # TAG_SUFFIX VALIDATION
@@ -182,6 +247,9 @@ jobs:
               if [[ ! "${TAG_SUFFIX}" =~ ^[A-Za-z0-9._-]+$ ]]; then
                   fail "'tag_suffix' contains invalid characters. Allowed: [A-Za-z0-9._-]"
               fi
+              echo "✅ tag_suffix '${TAG_SUFFIX}' is valid."
+          else
+              echo "ℹ️ tag_suffix not provided (optional)."
           fi
 
           ########################################################################
@@ -192,20 +260,24 @@ jobs:
                   if [[ -z "${REG_TOKEN:-}" ]]; then
                       fail "'mode'=${MODE} requires publishing: missing token for ghcr.io (GITHUB_TOKEN)."
                   fi
+                  echo "✅ Auth OK for GHCR (token present)."
               else
                   if [[ -z "${REG_USER:-}" && -n "${REG_TOKEN:-}" ]]; then
-                      fail "Publishing to ${REGISTRY} requires BOTH 'secrets.registry_username' and 'secrets.registry_token'. Username missing."
+                      fail "Publishing to ${REGISTRY} requires BOTH username and token. Username missing."
                   fi
                   if [[ -n "${REG_USER:-}" && -z "${REG_TOKEN:-}" ]]; then
-                      fail "Publishing to ${REGISTRY} requires BOTH 'secrets.registry_username' and 'secrets.registry_token'. Token missing."
+                      fail "Publishing to ${REGISTRY} requires BOTH username and token. Token missing."
                   fi
                   if [[ -z "${REG_USER:-}" ]]; then
-                      fail "'mode'=${MODE} requires publishing: 'secrets.registry_username' is required for ${REGISTRY}."
+                      fail "'mode'=${MODE} requires publishing: username required for ${REGISTRY}."
                   fi
                   if [[ -z "${REG_TOKEN:-}" ]]; then
-                      fail "'mode'=${MODE} requires publishing: 'secrets.registry_token' is required for ${REGISTRY}."
+                      fail "'mode'=${MODE} requires publishing: token required for ${REGISTRY}."
                   fi
+                  echo "✅ Auth OK for ${REGISTRY} (username + token)."
               fi
+          else
+              echo "ℹ️ Registry auth not required for mode '${MODE}'."
           fi
 
           ########################################################################
@@ -225,9 +297,13 @@ jobs:
                       fail "'build_platforms_csv' contains an empty entry."
                   fi
                   if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
-                      fail "'build_platforms_csv' entry '${_trimmed}' is not a valid os/arch (e.g., linux/amd64)."
+                      fail "'build_platforms_csv' entry '${_trimmed}' is not valid (e.g., linux/amd64)."
                   fi
+                  echo "✅ Platform entry '${_trimmed}' is valid."
               done
+              echo "✅ All platform entries validated."
+          else
+              echo "ℹ️ build_platforms_csv not relevant for mode '${MODE}'."
           fi
 
           ########################################################################
@@ -243,6 +319,9 @@ jobs:
               if [[ -n "${TAG_SUFFIX:-}" && "${EXTRA_BUILD_TAG}" == "latest-${TAG_SUFFIX}" ]]; then
                   fail "'extra_build_tag' must not be 'latest-${TAG_SUFFIX}'."
               fi
+              echo "✅ extra_build_tag '${EXTRA_BUILD_TAG}' is valid."
+          else
+              echo "ℹ️ extra_build_tag not provided (optional)."
           fi
 
           ########################################################################
@@ -258,6 +337,9 @@ jobs:
               if [[ -z "${CVMFS_GH_TOKEN:-}" ]]; then
                   fail "'mode'=${MODE} touches CVMFS: 'secrets.cvmfs_github_token' is required."
               fi
+              echo "✅ CVMFS inputs validated for mode '${MODE}'."
+          else
+              echo "ℹ️ CVMFS not touched in mode '${MODE}'."
           fi
 
           ########################################################################
@@ -275,10 +357,14 @@ jobs:
                   if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+$ ]]; then
                       fail "'cvmfs_remove_tags' entry '${_trimmed}' contains invalid characters. Allowed: [A-Za-z0-9._-]"
                   fi
+                  echo "✅ cvmfs_remove_tag '${_trimmed}' is valid."
               done <<< "${CVMFS_REMOVE_TAGS:-}"
+              echo "✅ All CVMFS removal tags validated."
+          else
+              echo "ℹ️ cvmfs_remove_tags not relevant for mode '${MODE}'."
           fi
 
-          echo "Conditional input validation: OK"
+          echo "🎯 All conditional input validations completed successfully."
 
       - name: "Normalize suffix for use in artifacts"
         id: suffix_norm_for_artifacts
