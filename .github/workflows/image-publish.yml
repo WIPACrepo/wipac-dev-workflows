@@ -231,7 +231,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
 
-  remove-from-cvmfs-maybe:
+  maybe-remove-from-cvmfs:
     needs: [ gameplan ]
     runs-on: ubuntu-latest
     if: >
@@ -552,7 +552,7 @@ jobs:
       inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [
       gameplan,
-      remove-from-cvmfs-maybe,  # needed b/c cvmfs removals need to happen before builds
+      maybe-remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
       tag-and-merge-published-images,  # needed for retrieving images
     ]
     runs-on: ubuntu-latest
@@ -632,7 +632,7 @@ jobs:
     needs: [
       # after all jobs:
       gameplan,
-      remove-from-cvmfs-maybe,
+      maybe-remove-from-cvmfs,
       build-w-platform-and-publish-by-sha,
       tag-and-merge-published-images,
       build-on-cvmfs,
