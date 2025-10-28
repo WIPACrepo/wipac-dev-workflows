@@ -258,9 +258,7 @@ jobs:
             core.setOutput('exists', hit ? 'true' : 'false');
             if (hit) {
               core.setFailed(
-              `Artifact guard "${target}" already exists in this workflow run.
-              Another workflow_call is using the same 'tag_suffix' (normalized).
-              Make each invocation's 'tag_suffix' unique (note: empty "" normalizes to "nosuffix").`
+                `Artifact guard "${target}" already exists in this workflow run. Another workflow_call is using the same 'tag_suffix' (normalized). Make each invocation's 'tag_suffix' unique (note: empty "" normalizes to "nosuffix").`
               );
             }
       - name: "Unique parallel artifacts check: Create guard file"
