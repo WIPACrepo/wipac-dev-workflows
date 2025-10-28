@@ -351,7 +351,7 @@ jobs:
       # === UPLOAD ===
       - uses: actions/upload-artifact@v4
         with:
-          name: platform-digests-${{ steps.save_digest.outputs.safe_platform }}
+          name: platform-digests-${{ inputs.image_name }}-${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'nosuffix' }}-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/to-be-artifacts/*
           if-no-files-found: error
           retention-days: 1
@@ -430,7 +430,7 @@ jobs:
       # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'nosuffix' }}-*
           path: platform-digests
           merge-multiple: true
 
@@ -646,7 +646,7 @@ jobs:
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'nosuffix' }}-*
           path: platform-digests
           merge-multiple: true
 
