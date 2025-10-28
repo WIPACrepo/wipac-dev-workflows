@@ -21,12 +21,18 @@ on:
           Examples: myimage, scanner
         type: string
         required: true
+      tag_suffix:
+        description: |
+          Optional suffix appended to every generated tag.
+          If provided, e.g. 'foo' -> 'v1.2.3-foo', 'v1.2-foo', 'v1-foo', 'main-foo', 'latest-foo', ...
+        type: string
+        default: ""
       mode:
         description: |
           The mode to use:
             BUILD                   - build and publish the image
             CVMFS_BUILD             - BUILD, then request CVMFS to build and persist the image
-            CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_images'
+            CVMFS_REMOVE            - request CVMFS to delete 'inputs.cvmfs_remove_tags'
             CVMFS_REMOVE_THEN_BUILD - CVMFS_REMOVE, then CVMFS_BUILD
         type: string
         required: true
@@ -109,6 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build-platform-matrix: ${{ steps.build-platforms.outputs.matrix }}
+      normalized-suffix: ${{ steps.suffix_norm_for_artifacts.outputs.norm }}
     steps:
       - name: Validate image format
         id: validate
@@ -136,6 +143,15 @@ jobs:
             echo "::error::'image_name' contains invalid characters. Found: '$image_name'"
             exit 1
           fi
+
+      - name: "Normalize suffix for use in artifacts"
+        id: suffix_norm_for_artifacts
+        shell: bash
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          norm="${{ inputs.tag_suffix }}"
+          if [[ -z "${norm}" ]]; then norm="nosuffix"; fi
+          echo "norm=${norm}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare build-platform matrix
         id: build-platforms
@@ -193,6 +209,7 @@ jobs:
             echo "${{ inputs.cvmfs_remove_tags }}"
             echo '```'
             echo "- \`extra_build_tag\` = ${{ inputs.extra_build_tag || 'null' }}"
+            echo "- \`tag_suffix\` = ${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'null' }}"
             echo ""
           
             if [[ "${{ inputs.mode }}" == "BUILD" || \
@@ -221,10 +238,45 @@ jobs:
             echo ""
 
             echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"     
+
+      # ── Early guard: prevent multiple workflow_call invocations from using the same tag_suffix
+      - name: "Unique parallel artifacts check: GitHub API"
+        id: suffix_guard_check
+        uses: actions/github-script@v7
+        env:
+          GUARD_NAME: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const run_id = context.runId;
+            const target = process.env.GUARD_NAME;
+            const res = await github.rest.actions.listWorkflowRunArtifacts({
+              owner, repo, run_id, per_page: 100
+            });
+            const hit = res.data.artifacts.find(a => a.name === target);
+            core.setOutput('exists', hit ? 'true' : 'false');
+            if (hit) {
+              core.setFailed(
+                `Another workflow_call is using the same 'tag_suffix' — make each invocation's 'tag_suffix' unique.`
+              );
+            }
+      - name: "Unique parallel artifacts check: Create guard file"
+        if: steps.suffix_guard_check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          printf "reserved by job=%s at %s\n" "${GITHUB_JOB}" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > guard.txt
+      - name: "Unique parallel artifacts check: Upload guard artifact"
+        if: steps.suffix_guard_check.outputs.exists == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
+          path: guard.txt
+          retention-days: 1
+          overwrite: false
 
 
-  remove-from-cvmfs-maybe:
+  maybe-remove-from-cvmfs:
     needs: [ gameplan ]
     runs-on: ubuntu-latest
     if: >
@@ -344,7 +396,7 @@ jobs:
       # === UPLOAD ===
       - uses: actions/upload-artifact@v4
         with:
-          name: platform-digests-${{ steps.save_digest.outputs.safe_platform }}
+          name: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.outputs.normalized-suffix }}-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/to-be-artifacts/*
           if-no-files-found: error
           retention-days: 1
@@ -423,7 +475,7 @@ jobs:
       # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.outputs.normalized-suffix }}-*
           path: platform-digests
           merge-multiple: true
 
@@ -470,6 +522,9 @@ jobs:
             # -> verbatim git tag (for non-semver tags)
             #   example: oct-20-prerelease, foo, etc.
             type=ref,event=tag,enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.is_v_semverish != 'true' }}
+          flavor: |
+            suffix=${{ inputs.tag_suffix != '' && format('-{0}', inputs.tag_suffix) || '' }}
+            latest=auto
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
@@ -542,7 +597,7 @@ jobs:
       inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [
       gameplan,
-      remove-from-cvmfs-maybe,  # needed b/c cvmfs removals need to happen before builds
+      maybe-remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
       tag-and-merge-published-images,  # needed for retrieving images
     ]
     runs-on: ubuntu-latest
@@ -551,6 +606,7 @@ jobs:
         id: select
         env:
           TAGS: ${{ needs.tag-and-merge-published-images.outputs.tags }}
+          TAG_SUFFIX: ${{ inputs.tag_suffix }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
@@ -561,28 +617,42 @@ jobs:
 
           # Read newline-delimited refs from env (robust against quoting)
           tags = [t.strip() for t in os.environ['TAGS'].splitlines() if t.strip()]
-          # Filter out 'latest' tag
-          filtered = [t for t in tags if not t.endswith(':latest')]
-
+          suffix = os.environ.get('TAG_SUFFIX', '').lstrip('-')
+          
           def tag_part(ref: str) -> str:
               return ref.rsplit(':', 1)[-1]
-
-          def first_match(rx: str):
-              # NOTE: matching only the tag part
+          
+          # Exclude 'latest' and 'latest-<suffix>'
+          filtered = []
+          for r in tags:
+            t = tag_part(r)
+            if t == 'latest' or (suffix and t == f'latest-{suffix}'):
+              continue
+            filtered.append(r)
+          
+          def first_match(rx_list: list[str]):
+            for rx in rx_list:
               pat = re.compile(rx)
               for ref in filtered:
-                if pat.search(tag_part(ref)):
+                if pat.fullmatch(tag_part(ref)):
                   return ref
-              return None
-
-          pick = (
-              first_match(r'^[vV]?\\d+\\.\\d+\\.\\d+$')   # full semver X.Y.Z (opt. v-prefix)
-              or first_match(r'^.+-[0-9a-f]{7}$')         # branch-SHA (7-char hex)
-              or first_match(r'^[vV]?\\d+\\.\\d+$')       # X.Y (opt. v-prefix)
-              or first_match(r'^[vV]?\\d+$')              # X (opt. v-prefix)
-              or (filtered[0] if filtered else None)      # fallback
-          )
-
+            return None
+          
+          # Base regexes (no suffix)
+          regexes = [
+            r'^[vV]?\d+\.\d+\.\d+$',   # v1.2.3
+            r'^.+-[0-9a-f]{7}$',       # new-feature-abcdef0
+            r'^[vV]?\d+\.\d+$',        # v1.2
+            r'^[vV]?\d+$',             # v1
+          ]
+          # -- if suffix provided, append suffixed variants
+          if suffix:
+            _suf = re.escape(suffix)
+            for base in list(regexes):
+              regexes.append(base.rstrip('$') + f'-{_suf}$')
+          
+          # Choose best tag
+          pick = first_match(regexes)
           if not pick:
             print('::error::Could not select a tag from generated list:', file=sys.stderr)
             for t in tags:
@@ -591,7 +661,7 @@ jobs:
           else:
             print(pick)
           ")"
-
+          
           echo "Selected for CVMFS: ${pick}"
           echo "tag=${pick}" >> "$GITHUB_OUTPUT"
 
@@ -607,7 +677,7 @@ jobs:
     needs: [
       # after all jobs:
       gameplan,
-      remove-from-cvmfs-maybe,
+      maybe-remove-from-cvmfs,
       build-w-platform-and-publish-by-sha,
       tag-and-merge-published-images,
       build-on-cvmfs,
@@ -621,7 +691,7 @@ jobs:
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.outputs.normalized-suffix }}-*
           path: platform-digests
           merge-multiple: true
 
