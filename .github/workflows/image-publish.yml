@@ -122,89 +122,57 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 
-          fail() {
-              echo "::error::$1"
-              exit 1
-          }
+          fail() { echo "::error::$1"; exit 1; }
 
           registry="${{ inputs.image_registry }}"
           namespace="${{ inputs.image_namespace }}"
           image_name="${{ inputs.image_name }}"
 
-          ########################################################################
-          # Basic presence + whitespace checks
-          ########################################################################
-          if [[ -z "${registry}" ]]; then
-              fail "'image_registry' must not be empty."
-          fi
-          if [[ -z "${namespace}" ]]; then
-              fail "'image_namespace' must not be empty."
-          fi
-          if [[ -z "${image_name}" ]]; then
-              fail "'image_name' must not be empty."
-          fi
+          echo "──────────────────────────────────────────────"
+          echo "🧩 VALIDATING IMAGE FORMAT INPUTS"
+          echo "──────────────────────────────────────────────"
 
-          if [[ "${registry}" =~ [[:space:]] ]]; then
-              fail "'image_registry' must not contain whitespace. Found: '${registry}'"
+          echo "→ Checking basic presence and whitespace..."
+          if [[ -z "${registry}" || -z "${namespace}" || -z "${image_name}" ]]; then
+              fail "All of 'image_registry', 'image_namespace', and 'image_name' must be non-empty."
           fi
-          if [[ "${namespace}" =~ [[:space:]] ]]; then
-              fail "'image_namespace' must not contain whitespace. Found: '${namespace}'"
+          if [[ "${registry}${namespace}${image_name}" =~ [[:space:]] ]]; then
+              fail "Inputs must not contain whitespace."
           fi
-          if [[ "${image_name}" =~ [[:space:]] ]]; then
-              fail "'image_name' must not contain whitespace. Found: '${image_name}'"
-          fi
+          echo "✅ Basic presence and whitespace OK."
 
-          echo "✅ Non-empty values provided, no whitespace detected."
-
-          ########################################################################
-          # Registry: lowercase alphanum + ._- and optional :port, no slash
-          ########################################################################
+          echo "→ Checking registry format..."
           if [[ "$registry" == *"/"* ]]; then
-              fail "'image_registry' must not contain '/'. Found: '${registry}'"
+              fail "'image_registry' must not contain '/'."
           fi
           if [[ ! "$registry" =~ ^[a-z0-9._-]+(:[0-9]+)?$ ]]; then
-              fail "'image_registry' contains invalid characters. Found: '${registry}'"
+              fail "'image_registry' contains invalid characters. Allowed: [a-z0-9._-] and optional :port"
           fi
+          echo "✅ Registry format OK."
 
-          echo "✅ Registry '${registry}' has valid format."
-
-          ########################################################################
-          # Namespace: may include slashes; must NOT include tag (:) or digest (@)
-          #            Each path segment: lowercase [a-z0-9._-]+; no empty segments
-          ########################################################################
-          if [[ "$namespace" == *":"* ]] || [[ "$namespace" == *"@"* ]]; then
-              fail "'image_namespace' must not include a tag or digest. Found: '${namespace}'"
+          echo "→ Checking namespace format..."
+          if [[ "$namespace" == *":"* || "$namespace" == *"@"* ]]; then
+              fail "'image_namespace' must not include a tag or digest."
           fi
-          if [[ "$namespace" == /* ]] || [[ "$namespace" == */ ]]; then
-              fail "'image_namespace' must not start or end with '/'. Found: '${namespace}'"
+          if [[ "$namespace" == /* || "$namespace" == */ || "$namespace" == *"//"* ]]; then
+              fail "'image_namespace' cannot start/end with '/' or contain '//'."
           fi
-          if [[ "$namespace" == *"//"* ]]; then
-              fail "'image_namespace' must not contain empty path segments ('//'). Found: '${namespace}'"
-          fi
-          IFS='/' read -r -a _ns_parts <<< "$namespace"
-          for seg in "${_ns_parts[@]}"; do
-              if [[ -z "$seg" ]]; then
-                  fail "'image_namespace' contains an empty path segment. Found: '${namespace}'"
-              fi
+          IFS='/' read -r -a parts <<< "$namespace"
+          for seg in "${parts[@]}"; do
               if [[ ! "$seg" =~ ^[a-z0-9._-]+$ ]]; then
-                  fail "'image_namespace' segment '${seg}' contains invalid characters. Allowed: [a-z0-9._-]"
+                  fail "'image_namespace' segment '${seg}' contains invalid characters."
               fi
-              echo "✅ Namespace segment '${seg}' is valid."
           done
+          echo "✅ Namespace format OK."
 
-          echo "✅ Namespace '${namespace}' has valid path segments and no tag/digest."
-
-          ########################################################################
-          # Image name: lowercase alphanum + ._-, no slash
-          ########################################################################
+          echo "→ Checking image name format..."
           if [[ "$image_name" == *"/"* ]]; then
-              fail "'image_name' must not contain '/'. Found: '${image_name}'"
+              fail "'image_name' must not contain '/'."
           fi
           if [[ ! "$image_name" =~ ^[a-z0-9._-]+$ ]]; then
-              fail "'image_name' contains invalid characters. Allowed: [a-z0-9._-]. Found: '${image_name}'"
+              fail "'image_name' contains invalid characters. Allowed: [a-z0-9._-]."
           fi
-
-          echo "✅ Image name '${image_name}' has valid format."
+          echo "✅ Image name format OK."
 
           echo "🎯 All image format validations passed successfully."
 
@@ -223,44 +191,87 @@ jobs:
           CVMFS_GH_TOKEN: ${{ secrets.cvmfs_github_token }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-
-          fail() {
-              echo "::error::$1"
-              exit 1
-          }
-
+          
+          fail() { echo "::error::$1"; exit 1; }
+          
+          echo "──────────────────────────────────────────────"
+          echo "🧩 VALIDATING CONDITIONAL INPUTS"
+          echo "──────────────────────────────────────────────"
+          
           ########################################################################
-          # MODE VALIDATION
+          # MODE
           ########################################################################
-          if [[ "${MODE}" != "BUILD" && \
-                "${MODE}" != "CVMFS_BUILD" && \
-                "${MODE}" != "CVMFS_REMOVE" && \
-                "${MODE}" != "CVMFS_REMOVE_THEN_BUILD" ]]; then
+          echo "→ Checking mode is one of {BUILD, CVMFS_BUILD, CVMFS_REMOVE, CVMFS_REMOVE_THEN_BUILD}..."
+          if [[ "${MODE}" == "BUILD" ]]; then
+              :
+          elif [[ "${MODE}" == "CVMFS_BUILD" ]]; then
+              :
+          elif [[ "${MODE}" == "CVMFS_REMOVE" ]]; then
+              :
+          elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              :
+          else
               fail "Invalid 'mode'='${MODE}'. Must be one of: BUILD, CVMFS_BUILD, CVMFS_REMOVE, CVMFS_REMOVE_THEN_BUILD."
           fi
-          echo "✅ Mode '${MODE}' is valid."
-
+          echo "✅ Mode '${MODE}' OK."
+          
           ########################################################################
-          # TAG_SUFFIX VALIDATION
+          # TAG_SUFFIX
           ########################################################################
+          echo "→ Checking tag_suffix (optional, charset)..."
           if [[ -n "${TAG_SUFFIX:-}" ]]; then
               if [[ ! "${TAG_SUFFIX}" =~ ^[A-Za-z0-9._-]+$ ]]; then
                   fail "'tag_suffix' contains invalid characters. Allowed: [A-Za-z0-9._-]"
               fi
-              echo "✅ tag_suffix '${TAG_SUFFIX}' is valid."
+              echo "✅ tag_suffix '${TAG_SUFFIX}' OK."
           else
-              echo "ℹ️ tag_suffix not provided (optional)."
+              echo "✅ tag_suffix not provided (optional)."
           fi
-
+          
           ########################################################################
-          # REGISTRY AUTH (BUILD MODES)
+          # EXTRA_BUILD_TAG
           ########################################################################
-          if [[ "${MODE}" == "BUILD" || "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+          echo "→ Checking extra_build_tag (optional, charset, not 'latest' or 'latest-<suffix>')..."
+          if [[ -n "${EXTRA_BUILD_TAG:-}" ]]; then
+              if [[ ! "${EXTRA_BUILD_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                  fail "'extra_build_tag' contains invalid characters. Allowed: [A-Za-z0-9._-]"
+              fi
+              if [[ "${EXTRA_BUILD_TAG}" == "latest" ]]; then
+                  fail "'extra_build_tag' must not be 'latest'."
+              fi
+              if [[ -n "${TAG_SUFFIX:-}" ]]; then
+                  _forbidden="latest-${TAG_SUFFIX}"
+                  if [[ "${EXTRA_BUILD_TAG}" == "${_forbidden}" ]]; then
+                      fail "'extra_build_tag' must not be '${_forbidden}'."
+                  fi
+              fi
+              echo "✅ extra_build_tag '${EXTRA_BUILD_TAG}' OK."
+          else
+              echo "✅ extra_build_tag not provided (optional)."
+          fi
+          
+          ########################################################################
+          # BUILD-MODE FLAG
+          ########################################################################
+          _is_build_mode=false
+          if [[ "${MODE}" == "BUILD" ]]; then
+              _is_build_mode=true
+          elif [[ "${MODE}" == "CVMFS_BUILD" ]]; then
+              _is_build_mode=true
+          elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              _is_build_mode=true
+          fi
+          
+          ########################################################################
+          # REGISTRY AUTH (only when building)
+          ########################################################################
+          if [[ "${_is_build_mode}" == "true" ]]; then
+              echo "→ Checking registry authentication requirements for '${REGISTRY}'..."
               if [[ "${REGISTRY}" == "ghcr.io" ]]; then
                   if [[ -z "${REG_TOKEN:-}" ]]; then
                       fail "'mode'=${MODE} requires publishing: missing token for ghcr.io (GITHUB_TOKEN)."
                   fi
-                  echo "✅ Auth OK for GHCR (token present)."
+                  echo "✅ GHCR token OK."
               else
                   if [[ -z "${REG_USER:-}" && -n "${REG_TOKEN:-}" ]]; then
                       fail "Publishing to ${REGISTRY} requires BOTH username and token. Username missing."
@@ -274,16 +285,17 @@ jobs:
                   if [[ -z "${REG_TOKEN:-}" ]]; then
                       fail "'mode'=${MODE} requires publishing: token required for ${REGISTRY}."
                   fi
-                  echo "✅ Auth OK for ${REGISTRY} (username + token)."
+                  echo "✅ ${REGISTRY} credentials (username + token) OK."
               fi
           else
-              echo "ℹ️ Registry auth not required for mode '${MODE}'."
+              echo "✅ Registry auth not required for mode '${MODE}'."
           fi
-
+          
           ########################################################################
-          # BUILD_PLATFORMS_CSV VALIDATION
+          # BUILD PLATFORMS (only when building)
           ########################################################################
-          if [[ "${MODE}" == "BUILD" || "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+          if [[ "${_is_build_mode}" == "true" ]]; then
+              echo "→ Checking build_platforms_csv presence and format..."
               if [[ -z "${BUILD_PLATFORMS_CSV:-}" ]]; then
                   fail "'build_platforms_csv' is empty but required when building."
               fi
@@ -299,35 +311,29 @@ jobs:
                   if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
                       fail "'build_platforms_csv' entry '${_trimmed}' is not valid (e.g., linux/amd64)."
                   fi
-                  echo "✅ Platform entry '${_trimmed}' is valid."
               done
-              echo "✅ All platform entries validated."
+              echo "✅ build_platforms_csv OK."
           else
-              echo "ℹ️ build_platforms_csv not relevant for mode '${MODE}'."
+              echo "✅ build_platforms_csv not required for mode '${MODE}'."
           fi
-
+          
           ########################################################################
-          # EXTRA_BUILD_TAG VALIDATION
+          # CVMFS-MODE FLAG
           ########################################################################
-          if [[ -n "${EXTRA_BUILD_TAG:-}" ]]; then
-              if [[ ! "${EXTRA_BUILD_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-                  fail "'extra_build_tag' contains invalid characters. Allowed: [A-Za-z0-9._-]"
-              fi
-              if [[ "${EXTRA_BUILD_TAG}" == "latest" ]]; then
-                  fail "'extra_build_tag' must not be 'latest'."
-              fi
-              if [[ -n "${TAG_SUFFIX:-}" && "${EXTRA_BUILD_TAG}" == "latest-${TAG_SUFFIX}" ]]; then
-                  fail "'extra_build_tag' must not be 'latest-${TAG_SUFFIX}'."
-              fi
-              echo "✅ extra_build_tag '${EXTRA_BUILD_TAG}' is valid."
-          else
-              echo "ℹ️ extra_build_tag not provided (optional)."
+          _touches_cvmfs=false
+          if [[ "${MODE}" == "CVMFS_BUILD" ]]; then
+              _touches_cvmfs=true
+          elif [[ "${MODE}" == "CVMFS_REMOVE" ]]; then
+              _touches_cvmfs=true
+          elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              _touches_cvmfs=true
           fi
-
+          
           ########################################################################
-          # CVMFS REQUIREMENTS (ALL CVMFS MODES)
+          # CVMFS PREREQUISITES (any mode that touches CVMFS)
           ########################################################################
-          if [[ "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+          if [[ "${_touches_cvmfs}" == "true" ]]; then
+              echo "→ Checking CVMFS prerequisites (dest_dir and github_token)..."
               if [[ -z "${CVMFS_DEST_DIR:-}" ]]; then
                   fail "'mode'=${MODE} touches CVMFS: 'inputs.cvmfs_dest_dir' is required."
               fi
@@ -337,15 +343,26 @@ jobs:
               if [[ -z "${CVMFS_GH_TOKEN:-}" ]]; then
                   fail "'mode'=${MODE} touches CVMFS: 'secrets.cvmfs_github_token' is required."
               fi
-              echo "✅ CVMFS inputs validated for mode '${MODE}'."
+              echo "✅ CVMFS prerequisites OK."
           else
-              echo "ℹ️ CVMFS not touched in mode '${MODE}'."
+              echo "✅ CVMFS prerequisites not required for mode '${MODE}'."
           fi
-
+          
           ########################################################################
-          # CVMFS_REMOVE TAGS VALIDATION
+          # REMOVAL-MODE FLAG
           ########################################################################
-          if [[ "${MODE}" == "CVMFS_REMOVE" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+          _is_remove_mode=false
+          if [[ "${MODE}" == "CVMFS_REMOVE" ]]; then
+              _is_remove_mode=true
+          elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              _is_remove_mode=true
+          fi
+          
+          ########################################################################
+          # CVMFS REMOVAL TAGS (only in removal modes)
+          ########################################################################
+          if [[ "${_is_remove_mode}" == "true" ]]; then
+              echo "→ Checking cvmfs_remove_tags content and charset..."
               if ! awk 'NF{exit 0} END{exit 1}' <<<"${CVMFS_REMOVE_TAGS:-}"; then
                   fail "'mode'=${MODE} requires 'inputs.cvmfs_remove_tags' (one tag per line)."
               fi
@@ -357,14 +374,13 @@ jobs:
                   if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+$ ]]; then
                       fail "'cvmfs_remove_tags' entry '${_trimmed}' contains invalid characters. Allowed: [A-Za-z0-9._-]"
                   fi
-                  echo "✅ cvmfs_remove_tag '${_trimmed}' is valid."
               done <<< "${CVMFS_REMOVE_TAGS:-}"
-              echo "✅ All CVMFS removal tags validated."
+              echo "✅ cvmfs_remove_tags OK."
           else
-              echo "ℹ️ cvmfs_remove_tags not relevant for mode '${MODE}'."
+              echo "✅ cvmfs_remove_tags not required for mode '${MODE}'."
           fi
-
-          echo "🎯 All conditional input validations completed successfully."
+          
+          echo "🎯 All conditional input validations passed successfully."
 
       - name: "Normalize suffix for use in artifacts"
         id: suffix_norm_for_artifacts
