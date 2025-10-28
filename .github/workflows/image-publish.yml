@@ -143,6 +143,16 @@ jobs:
             exit 1
           fi
 
+      - name: Normalize suffix for use in artifacts
+        id: suffix_norm_for_artifacts
+        shell: bash
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          norm="${{ inputs.tag_suffix }}"
+          # normalize: empty -> nosuffix
+          if [[ -z "${norm}" ]]; then norm="nosuffix"; fi
+          echo "norm=${norm}" >> "$GITHUB_OUTPUT"
+
       - name: Prepare build-platform matrix
         id: build-platforms
         run: |
@@ -228,7 +238,45 @@ jobs:
             echo ""
 
             echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"     
+
+      # ── Early guard: prevent multiple workflow_call invocations from using the same tag_suffix
+      - name: "Unique parallel artifacts check: GitHub API"
+        id: suffix_guard_check
+        uses: actions/github-script@v7
+        env:
+          GUARD_NAME: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const run_id = context.runId;
+            const target = process.env.GUARD_NAME;
+            const res = await github.rest.actions.listWorkflowRunArtifacts({
+              owner, repo, run_id, per_page: 100
+            });
+            const hit = res.data.artifacts.find(a => a.name === target);
+            core.setOutput('exists', hit ? 'true' : 'false');
+            if (hit) {
+              core.setFailed(
+              `Artifact guard "${target}" already exists in this workflow run.
+            
+              This means another workflow_call is using the same 'tag_suffix' (normalized).
+              Make each invocation's 'tag_suffix' unique (e.g., "", "chocolate" → collide if both normalize to "nosuffix").`
+              );
+            }
+      - name: "Unique parallel artifacts check: Create guard file"
+        if: steps.suffix_guard_check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          printf "reserved by job=%s at %s\n" "${GITHUB_JOB}" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > guard.txt
+      - name: "Unique parallel artifacts check: Upload guard artifact"
+        if: steps.suffix_guard_check.outputs.exists == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
+          path: guard.txt
+          retention-days: 1
+          overwrite: false
 
 
   maybe-remove-from-cvmfs:
@@ -351,7 +399,7 @@ jobs:
       # === UPLOAD ===
       - uses: actions/upload-artifact@v4
         with:
-          name: platform-digests-${{ inputs.image_name }}-${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'nosuffix' }}-${{ steps.save_digest.outputs.safe_platform }}
+          name: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.steps.suffix_norm_for_artifacts.outputs.norm }}-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/to-be-artifacts/*
           if-no-files-found: error
           retention-days: 1
@@ -430,7 +478,7 @@ jobs:
       # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-${{ inputs.image_name }}-${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'nosuffix' }}-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.steps.suffix_norm_for_artifacts.outputs.norm }}-*
           path: platform-digests
           merge-multiple: true
 
@@ -646,7 +694,7 @@ jobs:
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-${{ inputs.image_name }}-${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'nosuffix' }}-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.steps.suffix_norm_for_artifacts.outputs.norm }}-*
           path: platform-digests
           merge-multiple: true
 
