@@ -1,8 +1,8 @@
-# Reusable Workflow Overview: `image-publish.yml`
+# GHA Reusable Workflow Overview: `image-publish.yml`
 
 _Source: [WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml](https://github.com/WIPACrepo/wipac-dev-workflows/blob/main/.github/workflows/image-publish.yml)_
 
-This GitHub Actions workflow builds and pushes Docker images to Docker Hub, GitHub Container Registry (GHCR), Harbor, or other container registries, and optionally requests Singularity image builds or removals on CVMFS.
+This GitHub Actions **reusable workflow** builds and pushes Docker images to Docker Hub, GitHub Container Registry (GHCR), Harbor, or other container registries, and optionally requests Singularity image builds or removals on CVMFS.
 
 ## Inputs
 
