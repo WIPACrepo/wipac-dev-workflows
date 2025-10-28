@@ -1,4 +1,4 @@
-# GHA Reusable Workflow Overview: `image-publish.yml`
+# GHA Reusable Workflow: `image-publish.yml`
 
 _Source: [WIPACrepo/wipac-dev-workflows/.github/workflows/image-publish.yml](https://github.com/WIPACrepo/wipac-dev-workflows/blob/main/.github/workflows/image-publish.yml)_
 
