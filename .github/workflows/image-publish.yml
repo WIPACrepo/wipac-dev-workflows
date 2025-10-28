@@ -115,6 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build-platform-matrix: ${{ steps.build-platforms.outputs.matrix }}
+      normalized-suffix: ${{ steps.suffix_norm_for_artifacts.outputs.norm }}
     steps:
       - name: Validate image format
         id: validate
@@ -143,13 +144,12 @@ jobs:
             exit 1
           fi
 
-      - name: Normalize suffix for use in artifacts
+      - name: "Normalize suffix for use in artifacts"
         id: suffix_norm_for_artifacts
         shell: bash
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           norm="${{ inputs.tag_suffix }}"
-          # normalize: empty -> nosuffix
           if [[ -z "${norm}" ]]; then norm="nosuffix"; fi
           echo "norm=${norm}" >> "$GITHUB_OUTPUT"
 
@@ -259,9 +259,8 @@ jobs:
             if (hit) {
               core.setFailed(
               `Artifact guard "${target}" already exists in this workflow run.
-            
-              This means another workflow_call is using the same 'tag_suffix' (normalized).
-              Make each invocation's 'tag_suffix' unique (e.g., "", "chocolate" → collide if both normalize to "nosuffix").`
+              Another workflow_call is using the same 'tag_suffix' (normalized).
+              Make each invocation's 'tag_suffix' unique (note: empty "" normalizes to "nosuffix").`
               );
             }
       - name: "Unique parallel artifacts check: Create guard file"
@@ -399,7 +398,7 @@ jobs:
       # === UPLOAD ===
       - uses: actions/upload-artifact@v4
         with:
-          name: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.steps.suffix_norm_for_artifacts.outputs.norm }}-${{ steps.save_digest.outputs.safe_platform }}
+          name: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.outputs.normalized-suffix }}-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/to-be-artifacts/*
           if-no-files-found: error
           retention-days: 1
@@ -478,7 +477,7 @@ jobs:
       # === DOWNLOAD ===
       - uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.steps.suffix_norm_for_artifacts.outputs.norm }}-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.outputs.normalized-suffix }}-*
           path: platform-digests
           merge-multiple: true
 
@@ -694,7 +693,7 @@ jobs:
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         uses: actions/download-artifact@v4
         with:
-          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.steps.suffix_norm_for_artifacts.outputs.norm }}-*
+          pattern: platform-digests-${{ inputs.image_name }}-${{ needs.gameplan.outputs.normalized-suffix }}-*
           path: platform-digests
           merge-multiple: true
 
