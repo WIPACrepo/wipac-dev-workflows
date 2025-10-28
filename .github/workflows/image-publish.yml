@@ -117,70 +117,6 @@ jobs:
       build-platform-matrix: ${{ steps.build-platforms.outputs.matrix }}
       normalized-suffix: ${{ steps.suffix_norm_for_artifacts.outputs.norm }}
     steps:
-      - name: "Validate conditional inputs"
-        id: validate-conditional
-        env:
-          MODE: ${{ inputs.mode }}
-          REGISTRY: ${{ inputs.image_registry }}
-          CVMFS_DEST_DIR: ${{ inputs.cvmfs_dest_dir }}
-          CVMFS_REMOVE_TAGS: ${{ inputs.cvmfs_remove_tags }}
-          # Registry auth:
-          # - GHCR: username not required; token = GITHUB_TOKEN
-          # - Others: require both username and token
-          REG_USER: ${{ inputs.image_registry == 'ghcr.io' && '' || secrets.registry_username }}
-          REG_TOKEN: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
-          # CVMFS action PAT (used for build/remove requests)
-          CVMFS_GH_TOKEN: ${{ secrets.cvmfs_github_token }}
-        run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-
-          fail() {
-              echo "::error::$1"
-              exit 1
-          }
-
-          ########################################################################
-          # Validate MODE value
-          ########################################################################
-          case "${MODE}" in
-              BUILD|CVMFS_BUILD|CVMFS_REMOVE|CVMFS_REMOVE_THEN_BUILD) ;;
-              *) fail "Invalid 'mode'='${MODE}'. Must be one of: BUILD, CVMFS_BUILD, CVMFS_REMOVE, CVMFS_REMOVE_THEN_BUILD." ;;
-          esac
-
-          ########################################################################
-          # When building/publishing Docker images (any BUILD mode), ensure registry auth
-          # - ghcr.io → token (GITHUB_TOKEN) is sufficient; username not required
-          # - other registries → require both username & token
-          ########################################################################
-          if [[ "${MODE}" == "BUILD" || "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
-              if [[ "${REGISTRY}" == "ghcr.io" ]]; then
-                  [[ -n "${REG_TOKEN:-}" ]] || fail "'mode'=${MODE} requires publishing: missing token for ghcr.io (GITHUB_TOKEN)."
-              else
-                  [[ -n "${REG_USER:-}" ]] || fail "'mode'=${MODE} requires publishing: 'secrets.registry_username' is required for ${REGISTRY}."
-                  [[ -n "${REG_TOKEN:-}" ]] || fail "'mode'=${MODE} requires publishing: 'secrets.registry_token' is required for ${REGISTRY}."
-              fi
-          fi
-
-          ########################################################################
-          # When touching CVMFS (BUILD or REMOVE paths), ensure dest dir & PAT
-          ########################################################################
-          if [[ "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
-              [[ -n "${CVMFS_DEST_DIR:-}" ]]   || fail "'mode'=${MODE} touches CVMFS: 'inputs.cvmfs_dest_dir' is required."
-              [[ -n "${CVMFS_GH_TOKEN:-}" ]]   || fail "'mode'=${MODE} touches 'WIPACrepo/cvmfs-actions' repo: 'secrets.cvmfs_github_token' is required."
-          fi
-
-          ########################################################################
-          # When removing from CVMFS, require tags to remove
-          ########################################################################
-          if [[ "${MODE}" == "CVMFS_REMOVE" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
-              # Must contain at least one non-empty line
-              if ! awk 'NF{exit 0} END{exit 1}' <<<"${CVMFS_REMOVE_TAGS:-}"; then
-                  fail "'mode'=${MODE} requires 'inputs.cvmfs_remove_tags' (one tag per line)."
-              fi
-          fi
-
-          echo "Conditional input validation: OK"
-
       - name: "Validate image format"
         id: validate
         run: |
@@ -207,6 +143,142 @@ jobs:
             echo "::error::'image_name' contains invalid characters. Found: '$image_name'"
             exit 1
           fi
+
+      - name: "Validate conditional inputs"
+        id: validate-conditional
+        env:
+          MODE: ${{ inputs.mode }}
+          REGISTRY: ${{ inputs.image_registry }}
+          TAG_SUFFIX: ${{ inputs.tag_suffix }}
+          CVMFS_DEST_DIR: ${{ inputs.cvmfs_dest_dir }}
+          CVMFS_REMOVE_TAGS: ${{ inputs.cvmfs_remove_tags }}
+          EXTRA_BUILD_TAG: ${{ inputs.extra_build_tag }}
+          BUILD_PLATFORMS_CSV: ${{ inputs.build_platforms_csv }}
+          REG_USER: ${{ inputs.image_registry == 'ghcr.io' && '' || secrets.registry_username }}
+          REG_TOKEN: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
+          CVMFS_GH_TOKEN: ${{ secrets.cvmfs_github_token }}
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+
+          fail() {
+              echo "::error::$1"
+              exit 1
+          }
+
+          ########################################################################
+          # MODE VALIDATION
+          ########################################################################
+          if [[ "${MODE}" != "BUILD" && \
+                "${MODE}" != "CVMFS_BUILD" && \
+                "${MODE}" != "CVMFS_REMOVE" && \
+                "${MODE}" != "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              fail "Invalid 'mode'='${MODE}'. Must be one of: BUILD, CVMFS_BUILD, CVMFS_REMOVE, CVMFS_REMOVE_THEN_BUILD."
+          fi
+
+          ########################################################################
+          # TAG_SUFFIX VALIDATION
+          ########################################################################
+          if [[ -n "${TAG_SUFFIX:-}" ]]; then
+              if [[ ! "${TAG_SUFFIX}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                  fail "'tag_suffix' contains invalid characters. Allowed: [A-Za-z0-9._-]"
+              fi
+          fi
+
+          ########################################################################
+          # REGISTRY AUTH (BUILD MODES)
+          ########################################################################
+          if [[ "${MODE}" == "BUILD" || "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              if [[ "${REGISTRY}" == "ghcr.io" ]]; then
+                  if [[ -z "${REG_TOKEN:-}" ]]; then
+                      fail "'mode'=${MODE} requires publishing: missing token for ghcr.io (GITHUB_TOKEN)."
+                  fi
+              else
+                  if [[ -z "${REG_USER:-}" && -n "${REG_TOKEN:-}" ]]; then
+                      fail "Publishing to ${REGISTRY} requires BOTH 'secrets.registry_username' and 'secrets.registry_token'. Username missing."
+                  fi
+                  if [[ -n "${REG_USER:-}" && -z "${REG_TOKEN:-}" ]]; then
+                      fail "Publishing to ${REGISTRY} requires BOTH 'secrets.registry_username' and 'secrets.registry_token'. Token missing."
+                  fi
+                  if [[ -z "${REG_USER:-}" ]]; then
+                      fail "'mode'=${MODE} requires publishing: 'secrets.registry_username' is required for ${REGISTRY}."
+                  fi
+                  if [[ -z "${REG_TOKEN:-}" ]]; then
+                      fail "'mode'=${MODE} requires publishing: 'secrets.registry_token' is required for ${REGISTRY}."
+                  fi
+              fi
+          fi
+
+          ########################################################################
+          # BUILD_PLATFORMS_CSV VALIDATION
+          ########################################################################
+          if [[ "${MODE}" == "BUILD" || "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              if [[ -z "${BUILD_PLATFORMS_CSV:-}" ]]; then
+                  fail "'build_platforms_csv' is empty but required when building."
+              fi
+              IFS=',' read -r -a _plats <<< "${BUILD_PLATFORMS_CSV}"
+              if (( ${#_plats[@]} == 0 )); then
+                  fail "'build_platforms_csv' must list at least one platform (e.g., linux/amd64)."
+              fi
+              for p in "${_plats[@]}"; do
+                  _trimmed="$(echo "$p" | xargs)"
+                  if [[ -z "${_trimmed}" ]]; then
+                      fail "'build_platforms_csv' contains an empty entry."
+                  fi
+                  if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+                      fail "'build_platforms_csv' entry '${_trimmed}' is not a valid os/arch (e.g., linux/amd64)."
+                  fi
+              done
+          fi
+
+          ########################################################################
+          # EXTRA_BUILD_TAG VALIDATION
+          ########################################################################
+          if [[ -n "${EXTRA_BUILD_TAG:-}" ]]; then
+              if [[ ! "${EXTRA_BUILD_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                  fail "'extra_build_tag' contains invalid characters. Allowed: [A-Za-z0-9._-]"
+              fi
+              if [[ "${EXTRA_BUILD_TAG}" == "latest" ]]; then
+                  fail "'extra_build_tag' must not be 'latest'."
+              fi
+              if [[ -n "${TAG_SUFFIX:-}" && "${EXTRA_BUILD_TAG}" == "latest-${TAG_SUFFIX}" ]]; then
+                  fail "'extra_build_tag' must not be 'latest-${TAG_SUFFIX}'."
+              fi
+          fi
+
+          ########################################################################
+          # CVMFS REQUIREMENTS (ALL CVMFS MODES)
+          ########################################################################
+          if [[ "${MODE}" == "CVMFS_BUILD" || "${MODE}" == "CVMFS_REMOVE" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              if [[ -z "${CVMFS_DEST_DIR:-}" ]]; then
+                  fail "'mode'=${MODE} touches CVMFS: 'inputs.cvmfs_dest_dir' is required."
+              fi
+              if [[ "${CVMFS_DEST_DIR}" =~ [[:space:]] ]]; then
+                  fail "'cvmfs_dest_dir' must not contain whitespace."
+              fi
+              if [[ -z "${CVMFS_GH_TOKEN:-}" ]]; then
+                  fail "'mode'=${MODE} touches CVMFS: 'secrets.cvmfs_github_token' is required."
+              fi
+          fi
+
+          ########################################################################
+          # CVMFS_REMOVE TAGS VALIDATION
+          ########################################################################
+          if [[ "${MODE}" == "CVMFS_REMOVE" || "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+              if ! awk 'NF{exit 0} END{exit 1}' <<<"${CVMFS_REMOVE_TAGS:-}"; then
+                  fail "'mode'=${MODE} requires 'inputs.cvmfs_remove_tags' (one tag per line)."
+              fi
+              while IFS= read -r _line; do
+                  _trimmed="$(echo "${_line}" | xargs)"
+                  if [[ -z "${_trimmed}" ]]; then
+                      continue
+                  fi
+                  if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+                      fail "'cvmfs_remove_tags' entry '${_trimmed}' contains invalid characters. Allowed: [A-Za-z0-9._-]"
+                  fi
+              done <<< "${CVMFS_REMOVE_TAGS:-}"
+          fi
+
+          echo "Conditional input validation: OK"
 
       - name: "Normalize suffix for use in artifacts"
         id: suffix_norm_for_artifacts
