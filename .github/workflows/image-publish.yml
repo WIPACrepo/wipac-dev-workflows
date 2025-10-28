@@ -523,7 +523,7 @@ jobs:
             #   example: oct-20-prerelease, foo, etc.
             type=ref,event=tag,enable=${{ github.ref_type == 'tag' && steps.branch_for_tag.outputs.is_v_semverish != 'true' }}
           flavor: |
-            suffix=${{ inputs.tag_suffix }}
+            suffix=${{ inputs.tag_suffix != '' && format('-{0}', inputs.tag_suffix) || '' }}
             latest=auto
 
       # APPLY TAGS TO IMAGE(S)
