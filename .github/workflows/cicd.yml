@@ -22,4 +22,5 @@ jobs:
       project-type: gha-workflow
       version-style: 'X.Y'
       more-ignore-paths: |
-        !.github/workflows/**
+        !/.github/workflows/image-publish.*
+        !/.github/workflows/tag-and-release.*
