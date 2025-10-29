@@ -577,7 +577,7 @@ jobs:
         include: ${{ fromJson(needs.validate-and-plan.outputs.build-platform-matrix) }}
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
           fetch-depth: 0  # git history + tags -> python's setuptools-scm can get correct version
@@ -658,7 +658,7 @@ jobs:
       # TAG-PUSHES ONLY: DETECT THE RELATED BRANCH
       - name: "Tag-Pushes Only: Checkout" # do first, so we don't overwrite any files
         if: github.ref_type == 'tag'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0  # we need git tags
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
