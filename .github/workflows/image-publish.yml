@@ -506,7 +506,7 @@ jobs:
           printf "reserved by job=%s at %s\n" "${GITHUB_JOB}" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > guard.txt
       - name: "Unique parallel artifacts check: Upload guard artifact"
         if: steps.suffix_guard_check.outputs.exists == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
           path: guard.txt
@@ -632,7 +632,7 @@ jobs:
           cat "$file"
 
       # === UPLOAD ===
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: platform-digests-${{ inputs.image_name }}-${{ needs.validate-and-plan.outputs.normalized-suffix }}-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/to-be-artifacts/*
