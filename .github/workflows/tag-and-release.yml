@@ -137,7 +137,7 @@ jobs:
           fi
 
       # CHECKOUT #1 — EXACT EVENT SHA (full git history for validation)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # required to see tags and commits
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
@@ -169,7 +169,7 @@ jobs:
           fi
 
       # CHECKOUT #2 — BRANCH REF (for tag/push/release operations)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0  # required to see tags and commits
           ref: ${{ github.ref }}  # dont lock to sha (action needs to push)
