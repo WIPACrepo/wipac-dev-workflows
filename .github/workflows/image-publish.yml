@@ -370,39 +370,38 @@ jobs:
           fi
           
           ########################################################################
-          # CVMFS REMOVAL TAGS (only in removal modes)
+          # CVMFS REMOVAL TAGS (only in removal modes) — Python inline
           ########################################################################
           if [[ "${_is_remove_mode}" == "true" ]]; then
               echo "→ Checking cvmfs_remove_tags content..."
-              # require at least one non-blank, non-comment line
-              if ! awk 'NF && $1 !~ /^#/ {exit 0} END{exit 1}' <<<"${CVMFS_REMOVE_TAGS:-}"; then
-                  fail "'mode'=${MODE} requires 'inputs.cvmfs_remove_tags' (one tag per line, ignoring comments)."
-              fi
+              python -c '
+          import os, re, sys
           
-              while IFS= read -r _line; do
-                  # remove leading/trailing whitespace
-                  _trimmed="$(echo "${_line}" | xargs)"
-                  # strip inline comments (anything after '#')
-                  _trimmed="${_trimmed%%#*}"
-                  # trim again, in case comment removal leaves trailing space
-                  _trimmed="$(echo "${_trimmed}" | xargs)"
+          raw = os.environ.get("CVMFS_REMOVE_TAGS", "")
+          print("debug: raw CVMFS_REMOVE_TAGS follows:"); print(raw)
           
-                  if [[ -z "${_trimmed}" ]]; then
-                      # skip blank lines
-                      continue
-                  fi
-                  if [[ "${_trimmed}" =~ [[:space:]] ]]; then
-                      fail "'cvmfs_remove_tags' entry contains whitespace: '${_line}'"
-                  fi
-                  if (( ${#_trimmed} > 128 )); then
-                      fail "'cvmfs_remove_tags' entry too long (>128 chars): '${_trimmed}'"
-                  fi
-              done <<< "${CVMFS_REMOVE_TAGS:-}"
+          tags=[]
+          for i,line in enumerate(raw.splitlines(), 1):
+              s=line.strip()
+              if "#" in s:
+                  s=s.split("#",1)[0].strip()
+              if not s:
+                  continue
+              if re.search(r"\s",s):
+                  print(f"::error::cvmfs_remove_tags: line {i} has whitespace {line!r}"); sys.exit(1)
+              tags.append(s)
           
+          if not tags:
+              print("::error::cvmfs_remove_tags: no valid tags (one tag per line, comments allowed)"); sys.exit(1)
+          else:
+              print(\"validated cvmfs_remove_tags:\"); [print(t) for t in tags]
+          '
               echo "✅ cvmfs_remove_tags OK."
           else
               echo "✅ cvmfs_remove_tags not required for mode '${MODE}'."
           fi
+          
+          
           
           ########################################################################
           # DONE!
