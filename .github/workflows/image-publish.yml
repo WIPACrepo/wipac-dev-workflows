@@ -394,7 +394,7 @@ jobs:
           if not tags:
               print("::error::cvmfs_remove_tags: no valid tags (one tag per line, comments allowed)"); sys.exit(1)
           else:
-              print(\"validated cvmfs_remove_tags:\"); [print(t) for t in tags]
+              print(f"validated cvmfs_remove_tags: {tags}")
           '
               echo "✅ cvmfs_remove_tags OK."
           else
