@@ -197,18 +197,13 @@ jobs:
           echo "──────────────────────────────────────────────"
           echo "🔠 INPUTS"
           echo "──────────────────────────────────────────────"
-          set -x
-          echo "$MODE"
-          echo "$REGISTRY"
-          echo "$TAG_SUFFIX"
-          echo "$CVMFS_DEST_DIR"
-          echo "$CVMFS_REMOVE_TAGS"
-          echo "$EXTRA_BUILD_TAG"
-          echo "$BUILD_PLATFORMS_CSV"
-          echo "$REG_USER"
-          echo "$REG_TOKEN"
-          echo "$CVMFS_GH_TOKEN"
-          set +x
+          echo "mode: $MODE"
+          echo "registry: $REGISTRY"
+          echo "tag_suffix: $TAG_SUFFIX"
+          echo "cvmfs_dest_dir: $CVMFS_DEST_DIR"
+          echo "cvmfs_remove_tags: $CVMFS_REMOVE_TAGS"
+          echo "extra_build_tag: $EXTRA_BUILD_TAG"
+          echo "build_platforms_csv: $BUILD_PLATFORMS_CSV"
           
           echo "──────────────────────────────────────────────"
           echo "🧩 VALIDATING CONDITIONAL INPUTS"
@@ -378,24 +373,40 @@ jobs:
           # CVMFS REMOVAL TAGS (only in removal modes)
           ########################################################################
           if [[ "${_is_remove_mode}" == "true" ]]; then
-              echo "→ Checking cvmfs_remove_tags content and charset..."
-              if ! awk 'NF{exit 0} END{exit 1}' <<<"${CVMFS_REMOVE_TAGS:-}"; then
-                  fail "'mode'=${MODE} requires 'inputs.cvmfs_remove_tags' (one tag per line)."
+              echo "→ Checking cvmfs_remove_tags content..."
+              # require at least one non-blank, non-comment line
+              if ! awk 'NF && $1 !~ /^#/ {exit 0} END{exit 1}' <<<"${CVMFS_REMOVE_TAGS:-}"; then
+                  fail "'mode'=${MODE} requires 'inputs.cvmfs_remove_tags' (one tag per line, ignoring comments)."
               fi
+          
               while IFS= read -r _line; do
+                  # remove leading/trailing whitespace
                   _trimmed="$(echo "${_line}" | xargs)"
+                  # strip inline comments (anything after '#')
+                  _trimmed="${_trimmed%%#*}"
+                  # trim again, in case comment removal leaves trailing space
+                  _trimmed="$(echo "${_trimmed}" | xargs)"
+          
                   if [[ -z "${_trimmed}" ]]; then
+                      # skip blank lines
                       continue
                   fi
-                  if [[ ! "${_trimmed}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-                      fail "'cvmfs_remove_tags' entry '${_trimmed}' contains invalid characters. Allowed: [A-Za-z0-9._-]"
+                  if [[ "${_trimmed}" =~ [[:space:]] ]]; then
+                      fail "'cvmfs_remove_tags' entry contains whitespace: '${_line}'"
+                  fi
+                  if (( ${#_trimmed} > 128 )); then
+                      fail "'cvmfs_remove_tags' entry too long (>128 chars): '${_trimmed}'"
                   fi
               done <<< "${CVMFS_REMOVE_TAGS:-}"
+          
               echo "✅ cvmfs_remove_tags OK."
           else
               echo "✅ cvmfs_remove_tags not required for mode '${MODE}'."
           fi
           
+          ########################################################################
+          # DONE!
+          ########################################################################
           echo "🎯 All conditional input validations passed successfully."
 
       - name: "Normalize suffix for use in artifacts"
