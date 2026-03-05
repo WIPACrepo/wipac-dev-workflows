@@ -9,6 +9,21 @@ on:
           HINT: Use '$ {{ github.event.repository.default_branch }}' (no space after $)
         required: true
         type: string
+      max-complexity:
+        description: |
+          The max allowed McCabe complexity value per function
+          <10:   easier to understand
+          10-15: medium complexity (ideal range)
+          >15:   harder to understand
+        required: false
+        default: '15'
+        type: number
+      max-statements:
+        description: |
+          The max number of statements per function
+        required: false
+        default: '50'
+        type: number
 
 jobs:
 
@@ -24,8 +39,8 @@ jobs:
           args: "--version"  # noop, just install ruff
       - name: Ruff base (repo-wide; respect repo config)
         env:
-          MAX_COMPLEXITY: "15"
-          MAX_STATEMENTS: "200"
+          MAX_COMPLEXITY: ${{ inputs.max-complexity }}
+          MAX_STATEMENTS: ${{ inputs.max-statements }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           ruff check \
