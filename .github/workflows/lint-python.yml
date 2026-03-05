@@ -27,7 +27,7 @@ on:
 
 jobs:
 
-  ruff-repo:
+  ruff-whole-repo:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +50,9 @@ jobs:
               --config "lint.pylint.max-statements=${MAX_STATEMENTS}" \
               .
 
-  ruff-pr:
+  ruff-branch-changes:
+    # Only run on non-default branches
+    if: ${{ github.ref_type == 'branch' && (github.head_ref || github.ref_name) != inputs.default-branch }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

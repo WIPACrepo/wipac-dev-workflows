@@ -59,11 +59,11 @@ export CHANGED_LINES_FILE
 CHANGED_LINES_FILE="$(mktemp)"
 
 ########################################################################
-# PR commit SHAs = merge-base..HEAD
+# Branch's commit SHAs = merge-base..HEAD
 ########################################################################
 git rev-list "${MERGE_BASE}..${HEAD_SHA}" >"${PR_SHAS_FILE}"
 
-echo "SHAs for this PR:"
+echo "SHAs for this Branch:"
 cat "$PR_SHAS_FILE"
 echo
 
@@ -94,7 +94,7 @@ cat "$RUFF_OUT"
 echo
 
 ########################################################################
-# Build allowlist: "fpath:lineno" for lines last-touched by PR SHAs (blame HEAD)
+# Build allowlist: "fpath:lineno" for lines last-touched by Branch's SHAs (blame HEAD)
 ########################################################################
 python3 -c '
 import os
@@ -141,7 +141,7 @@ echo
 ########################################################################
 # Filter Ruff output: keep only diagnostics whose "fpath:lineno" is in changed_lines
 ########################################################################
-echo "Ruff issues on lines last-touched by this PR range:"
+echo "Ruff issues on lines last-touched by this branch:"
 
 python3 -c '
 import os, sys
@@ -169,8 +169,8 @@ for fpath_lineno in CHANGED_LINES:
 if keepers:
     for line in keepers:
         print("::error::" + line)
-    print(f"::error::Found {len(keepers)} errors on lines touched by this PR.")
+    print(f"::error::Found {len(keepers)} errors on lines touched by this branch.")
     sys.exit(1)
 else:
-    print("::info::No errors on lines touched by this PR.")
+    print("::info::No errors on lines touched by this branch.")
 '
