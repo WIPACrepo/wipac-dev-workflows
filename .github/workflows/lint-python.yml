@@ -4,7 +4,9 @@ on:
   workflow_call:
     inputs:
       default-branch:
-        description: "Repo default branch (e.g., main)"
+        description: |
+          Your repo's default branch (e.g., main)
+          HINT: Use '$ {{ github.event.repository.default_branch }}' (no space after $)
         required: true
         type: string
 
@@ -43,15 +45,15 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: WIPACrepo/wipac-dev-workflows  # aka, here
-          ref: main
-          path: .wipac-actions
+          ref: ${{ github.workflow_sha }}
+          path: .wipac-dev-workflows
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Ruff strict (PR-touched lines)
+      - name: Ruff PR-touched lines (stricter than repo-wide)
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
           RUFF_SELECT: "I,UP,FA"
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          .wipac-actions/tools/ruff-this.sh
+          .wipac-dev-workflows/tools/ruff-this.sh
