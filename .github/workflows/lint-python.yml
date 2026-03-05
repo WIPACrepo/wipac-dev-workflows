@@ -12,6 +12,7 @@ on:
       py-matrix-json:
         description: |
           The JSON string of the matrix of Python versions to lint against
+          HINT: Use '$ {{ needs.py-versions.outputs.matrix }}' (no space after $)
         required: true
         type: string
       max-complexity:
