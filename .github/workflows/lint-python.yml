@@ -1,0 +1,46 @@
+name: lint-python.yml
+
+on:
+  workflow_call
+
+
+jobs:
+
+  ruff-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: "--version"
+      - name: Ruff base (repo-wide; respect repo config)
+        env:
+          MAX_COMPLEXITY: "15"
+          MAX_STATEMENTS: "200"
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          ruff check \
+              --output-format github \
+              --extend-select C901,PLR0915 \
+              --config "lint.mccabe.max-complexity=${MAX_COMPLEXITY}" \
+              --config "lint.pylint.max-statements=${MAX_STATEMENTS}" \
+              .
+
+  ruff-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - uses: astral-sh/ruff-action@v3
+      - name: Ruff strict (PR-touched lines)
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RUFF_SELECT: "I,UP,FA"
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          ./tools/ruff-this.sh
