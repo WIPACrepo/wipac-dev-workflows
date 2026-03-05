@@ -14,7 +14,7 @@ on:
           The max allowed McCabe complexity value per function
           <10:   easier to understand
           10-15: medium complexity (ideal range)
-          >15:   harder to understand
+          >15:   harder to understand and maintain
         required: false
         default: '15'
         type: number
