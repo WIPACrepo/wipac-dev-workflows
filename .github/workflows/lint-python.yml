@@ -9,6 +9,11 @@ on:
           HINT: Use '$ {{ github.event.repository.default_branch }}' (no space after $)
         required: true
         type: string
+      py-matrix-json:
+        description: |
+          The JSON string of the matrix of Python versions to lint against
+        required: true
+        type: string
       max-complexity:
         description: |
           The max allowed McCabe complexity value per function
@@ -27,6 +32,22 @@ on:
 
 jobs:
 
+  mypy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        py3: ${{ fromJSON(inputs.py-matrix-json) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+          fetch-depth: 0  # setuptools-scm needs to access git tags
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.py3 }}
+      - uses: WIPACrepo/wipac-dev-mypy-action@v2.0
+
   ruff-whole-repo:
     runs-on: ubuntu-latest
     steps:
@@ -43,6 +64,7 @@ jobs:
           MAX_STATEMENTS: ${{ inputs.max-statements }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          # note: ruff will use the project's minimum Python version from pyproject.toml
           ruff check \
               --output-format github \
               --extend-select C901,PLR0915 \
@@ -73,4 +95,5 @@ jobs:
           RUFF_SELECT: "I,UP,FA"
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          # note: ruff will use the project's minimum Python version from pyproject.toml
           .wipac-dev-workflows/tools/ruff-this.sh
