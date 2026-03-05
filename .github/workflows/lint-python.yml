@@ -1,8 +1,12 @@
 name: lint-python.yml
 
 on:
-  workflow_call
-
+  workflow_call:
+    inputs:
+      default-branch:
+        description: "Repo default branch (e.g., main)"
+        required: true
+        type: string
 
 jobs:
 
@@ -15,7 +19,7 @@ jobs:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
       - uses: astral-sh/ruff-action@v3
         with:
-          args: "--version"
+          args: "--version"  # noop, just install ruff
       - name: Ruff base (repo-wide; respect repo config)
         env:
           MAX_COMPLEXITY: "15"
@@ -36,11 +40,18 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - uses: actions/checkout@v6
+        with:
+          repository: WIPACrepo/wipac-dev-workflows  # aka, here
+          ref: main
+          path: .wipac-actions
       - uses: astral-sh/ruff-action@v3
+        with:
+          args: "--version"  # noop, just install ruff
       - name: Ruff strict (PR-touched lines)
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEFAULT_BRANCH: ${{ inputs.default-branch }}
           RUFF_SELECT: "I,UP,FA"
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          ./tools/ruff-this.sh
+          .wipac-actions/tools/ruff-this.sh
