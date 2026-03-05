@@ -21,13 +21,13 @@ on:
           10-15: medium complexity (ideal range)
           >15:   harder to understand and maintain
         required: false
-        default: '15'
+        default: 15
         type: number
       max-statements:
         description: |
           The max number of statements per function
         required: false
-        default: '50'
+        default: 50
         type: number
 
 jobs:
