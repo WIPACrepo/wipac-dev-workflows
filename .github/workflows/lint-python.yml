@@ -100,7 +100,7 @@ jobs:
 
           # dump
           cat "$outf"
-          ty_error_count="$(grep -c '^::error::' "$outf" || true)"
+          ty_error_count="$(grep -c '^::error' "$outf" || true)"
           echo "Found $ty_error_count errors."
 
           exit "$ty_exit_code"
