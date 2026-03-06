@@ -30,6 +30,12 @@ on:
         required: false
         default: 50
         type: number
+      ruff-changed-line-radius:
+        description: |
+          How many lines on each side of the changed lines to pull in for Ruff
+        required: false
+        default: 2
+        type: number
 
 jobs:
 
@@ -110,7 +116,7 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
           RUFF_SELECT: "I,UP,FA"
-          CHANGED_LINE_RADIUS: 3  # how many lines on each side to pull in
+          CHANGED_LINE_RADIUS: ${{ inputs.ruff-changed-line-radius }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           # note: ruff will use the project's minimum Python version from pyproject.toml
