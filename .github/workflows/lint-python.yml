@@ -73,8 +73,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.py3 }}
       - uses: astral-sh/setup-uv@v7
-      - run: uvx ty check --python-version ${{ matrix.py3 }} --output-format github
+        with:
+          enable-cache: true
+      - name: Install project dependencies
+        run: uv sync --locked --dev
+      - name: Run ty
+        run: uv run ty check --python-version ${{ matrix.py3 }} --output-format github
 
   ruff-whole-repo:
     runs-on: ubuntu-latest
