@@ -46,22 +46,11 @@ echo "MERGE_BASE=${MERGE_BASE}"
 ########################################################################
 # Temp files (export paths so python can read/write them)
 ########################################################################
-export PR_SHAS_FILE
-PR_SHAS_FILE="$(mktemp)"
-
 export CHANGED_FILES_FILE
 CHANGED_FILES_FILE="$(mktemp)"
 
 export RUFF_OUT
 RUFF_OUT="$(mktemp)"
-
-########################################################################
-# Branch's commit SHAs = merge-base..HEAD
-########################################################################
-git rev-list "${MERGE_BASE}..${HEAD_SHA}" >"${PR_SHAS_FILE}"
-echo "SHAs for this Branch:"
-cat "$PR_SHAS_FILE"
-echo
 
 ########################################################################
 # Changed python files = diff from merge-base..HEAD (skip deletions)

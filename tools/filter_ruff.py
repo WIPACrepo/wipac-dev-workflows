@@ -1,12 +1,14 @@
 """Filter Ruff output to only include diagnostics for lines touched by this branch."""
 
 import os
+import pprint
 import re
 import subprocess
 import sys
 
 # env vars
-PR_SHAS = set(open(os.environ["PR_SHAS_FILE"]).read().split())
+HEAD_SHA = os.environ["HEAD_SHA"]
+MERGE_BASE = os.environ["MERGE_BASE"]
 CHANGED_FILES = [x.strip() for x in open(os.environ["CHANGED_FILES_FILE"]) if x.strip()]
 RUFF_OUT = [x.strip() for x in open(os.environ["RUFF_OUT"]) if x.strip()]
 CONTEXT_LINE_RADIUS = int(os.environ.get("CONTEXT_LINE_RADIUS", 0))
@@ -19,13 +21,13 @@ GIT_BLAME_LINE_PORCELAIN_HEADER_RE = re.compile(
 RUFF_FILE_LINENO_RE = re.compile(r"^(?:Error:\s+)?(?P<path>[^:]+):(?P<lineno>\d+):")
 
 
-def get_changed_file_linenos() -> dict[str, set[int]]:
+def get_changed_file_linenos(branch_shas: list[str]) -> dict[str, set[int]]:
     """Return the files mapped to line-numbers last-touched by this branch."""
     changed_file_linenos: dict[str, set[int]] = {}
 
     for path in CHANGED_FILES:
         txt = subprocess.check_output(
-            ["git", "blame", "--line-porcelain", os.environ["HEAD_SHA"], "--", path],
+            ["git", "blame", "--line-porcelain", HEAD_SHA, "--", path],
             text=True,
         )
         for line in txt.splitlines():
@@ -44,7 +46,7 @@ def get_changed_file_linenos() -> dict[str, set[int]]:
             # 46db3ed19651652e6b875dffd1b15533f030d9f2 7 7 1
             # ...
             if m := GIT_BLAME_LINE_PORCELAIN_HEADER_RE.match(line):
-                if m.group("sha") in PR_SHAS:
+                if m.group("sha") in branch_shas:
                     final_lineno = int(m.group("final_lineno"))
                     try:
                         changed_file_linenos[path].add(final_lineno)
@@ -83,15 +85,22 @@ def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
 
 def main():
     """Main."""
-    # 1: get changed lines
-    changed_file_linenos = get_changed_file_linenos()
-    print("Changed lines:")
-    for p in sorted(changed_file_linenos):
-        for n in sorted(changed_file_linenos[p]):
-            print(f"{p}:{n}")
+    # 0. Get all the SHAs of the commits in this branch
+    branch_shas = subprocess.check_output(
+        ["git", "rev-list", f"{MERGE_BASE}..{HEAD_SHA}"],
+        text=True,
+    ).splitlines()
+    print("Commit SHAs for this Branch:")
+    pprint.pprint(branch_shas)
     print()
 
-    # 2: filter ruff output for only those lines
+    # 1: Get changed lines
+    changed_file_linenos = get_changed_file_linenos(branch_shas)
+    print("Changed lines:")
+    pprint.pprint(changed_file_linenos)
+    print()
+
+    # 2: Filter ruff output for only those lines -> print for GitHub Actions
     keepers = filter_ruff_out(changed_file_linenos)
     print("Ruff issues on lines last-touched by this branch:")
     if keepers:
