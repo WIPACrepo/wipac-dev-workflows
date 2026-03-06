@@ -32,10 +32,18 @@ on:
         type: number
       ruff-changed-line-radius:
         description: |
-          How many lines on each side of the changed lines to pull in for Ruff
+          ** USED IN JOB THAT IS ONLY RUN ON NON-DEFAULT BRANCHES **
+          How many lines on each side of the branch's changed lines to pull in for Ruff
         required: false
         default: 2
         type: number
+      ruff-changed-line-rules:
+        description: |
+          ** USED IN JOB THAT IS ONLY RUN ON NON-DEFAULT BRANCHES **
+          Which Ruff rules to lint for branch's changed lines
+        required: false
+        default: "I,UP,FA"
+        type: string
 
 jobs:
 
@@ -115,7 +123,7 @@ jobs:
       - name: Ruff PR-touched lines (stricter than repo-wide)
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
-          RUFF_SELECT: "I,UP,FA"
+          RUFF_SELECT: ${{ inputs.ruff-changed-line-rules }}
           CHANGED_LINE_RADIUS: ${{ inputs.ruff-changed-line-radius }}
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
