@@ -78,7 +78,7 @@ jobs:
           MAX_COMPLEXITY: ${{ inputs.max-complexity }}
           MAX_STATEMENTS: ${{ inputs.max-statements }}
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           # note: ruff will use the project's minimum Python version from pyproject.toml
           ruff check \
               --output-format github \
@@ -99,7 +99,7 @@ jobs:
       - name: Determine reusable workflow ref (somehow not provided by a GHA macro)
         id: here
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           echo $GITHUB_WORKFLOW_REF
           caller_ref="${GITHUB_WORKFLOW_REF%%@*}"  # drop "@refs/..."
           echo $caller_ref
@@ -126,6 +126,6 @@ jobs:
           RUFF_SELECT: ${{ inputs.ruff-changed-line-rules }}
           CHANGED_LINE_RADIUS: ${{ inputs.ruff-changed-line-radius }}
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           # note: ruff will use the project's minimum Python version from pyproject.toml
           .wipac-dev-workflows/tools/ruff-this-branch.sh
