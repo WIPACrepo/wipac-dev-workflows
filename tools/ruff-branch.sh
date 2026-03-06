@@ -23,20 +23,13 @@ fi
 # Repo refs (all exported so downstream commands + python can use them)
 ########################################################################
 git fetch origin --prune --no-tags
-
-export HEAD_SHA
 HEAD_SHA="$(git rev-parse HEAD)"
-
-export BASE_REF
 BASE_REF="origin/${DEFAULT_BRANCH}"
-
-export MERGE_BASE
 MERGE_BASE="$(git merge-base "$BASE_REF" "$HEAD_SHA")"
 
 ########################################################################
 # Dump
 ########################################################################
-
 echo "RUFF_SELECT=${RUFF_SELECT}"
 echo "DEFAULT_BRANCH=${DEFAULT_BRANCH}"
 echo "BASE_REF=${BASE_REF}"
@@ -44,12 +37,9 @@ echo "HEAD_SHA=${HEAD_SHA}"
 echo "MERGE_BASE=${MERGE_BASE}"
 
 ########################################################################
-# Temp files (export paths so python can read/write them)
+# Temp files (export paths so python can read them)
 ########################################################################
-export CHANGED_FILES_FILE
 CHANGED_FILES_FILE="$(mktemp)"
-
-export RUFF_OUT
 RUFF_OUT="$(mktemp)"
 
 ########################################################################
@@ -82,4 +72,5 @@ echo
 # Filter Ruff output using script
 ########################################################################
 here_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+export HEAD_SHA MERGE_BASE CHANGED_FILES_FILE RUFF_OUT
 python3 "$here_dir"/filter_ruff.py
