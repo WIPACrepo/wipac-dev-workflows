@@ -86,10 +86,20 @@ jobs:
         id: here
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
-          echo $$GITHUB_WORKFLOW_REF
-          ref="$(yq -r '.. | .uses? | select(. != null)
-              | select(test("WIPACrepo/wipac-dev-workflows/\\.github/workflows/lint-python\\.yml@"))
-              | sub("^.*@"; "")' $GITHUB_WORKFLOW_REF | head -n 1)"
+          echo $GITHUB_WORKFLOW_REF
+          ref="$(
+              awk '
+                  $1 == "uses:" && $2 ~ /WIPACrepo\/wipac-dev-workflows\/\.github\/workflows\/lint-python\.yml@/ {
+                      s = $2
+                      sub(/^.*@/, "", s)   # keep only the ref after @
+                      sub(/#.*/, "", s)    # strip inline comments
+                      gsub(/[[:space:]]+$/, "", s)
+                      print s
+                      exit
+                  }
+              ' $GITHUB_WORKFLOW_REF
+          )"
+          [[ -n "${ref}" ]] || { echo "ERROR: could not find here_ref in caller's workflow"; exit 1; }
           echo $ref
           echo "here_ref=${ref}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v6
