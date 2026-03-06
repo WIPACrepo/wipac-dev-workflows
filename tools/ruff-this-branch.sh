@@ -59,10 +59,11 @@ xargs -r ruff check --select "$RUFF_SELECT" --output-format concise \
     <"${CHANGED_FILES_FILE}" >"${RUFF_OUT}" || ruff_rc=$?
 
 if [[ $ruff_rc -eq 0 ]]; then
-    echo "No ruff errors"
+    echo "No ruff errors."
     exit 0
 elif [[ $ruff_rc -eq 1 ]]; then
-    echo "Found ruff errors"
+    echo "Found ruff errors (will be filtered):"
+    cat "$RUFF_OUT"
 else
     echo "ERROR: Ruff failed abnormally with exit code ${ruff_rc}"
     cat "$RUFF_OUT"
@@ -74,4 +75,4 @@ fi
 ########################################################################
 here_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 export HEAD_SHA MERGE_BASE CHANGED_FILES_FILE RUFF_OUT
-python3 "$here_dir"/filter_ruff.py
+python3 "$here_dir"/ruff_line_filter.py
