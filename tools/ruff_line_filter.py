@@ -106,18 +106,25 @@ def main():
 
     # 2: Filter ruff output for only those lines -> print for GitHub Actions
     keepers = filter_ruff_out(changed_file_linenos)
-    print("Ruff issues on lines last-touched by this branch:")
+    print(
+        f"Ruff errors on lines touched by this branch"
+        + (
+            ":"
+            if not CHANGED_LINE_RADIUS
+            else f" (or within {CHANGED_LINE_RADIUS} lines of touched lines):"
+        )
+    )
     if keepers:
         for line in keepers:
             print("::error::" + line)
-        print(f"::error::Found {len(keepers)} errors on lines touched by this branch.")
+        print(f"Found {len(keepers)} errors.")
         print(
             f"::notice::You can run 'ruff check --select {os.environ['RUFF_SELECT']}"
             " (--fix|--fix-only) [PATHS]' to auto-fix *all* issues in file(s)."
         )
         sys.exit(1)
     else:
-        print("::info::No errors on lines touched by this branch.")
+        print("::info::No ruff errors.")
 
 
 if __name__ == "__main__":

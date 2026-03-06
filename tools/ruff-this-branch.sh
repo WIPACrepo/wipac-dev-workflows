@@ -64,10 +64,10 @@ cat "${RUFF_OUT}"
 echo "::endgroup::"
 
 if [[ $ruff_rc -eq 0 ]]; then
-    echo "No ruff errors."
+    echo "::info::No ruff errors."
     exit 0
 elif [[ $ruff_rc -eq 1 ]]; then
-    echo "Found ruff errors (will be filtered):"
+    echo "Found ruff errors (will be filtered)"
     echo
 else
     echo "ERROR: Ruff failed abnormally with exit code ${ruff_rc}"
