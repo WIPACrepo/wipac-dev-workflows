@@ -81,7 +81,7 @@ jobs:
         with:
           enable-cache: true
       - name: Install project + ty extra
-        run: uv sync --extra mypy
+        run: uv sync --extra mypy  # it's okay if this extra does not exist
       - name: Run ty
         run: uv run --python-version ${{ matrix.py3 }} ty check --output-format github
 
