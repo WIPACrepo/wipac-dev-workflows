@@ -83,7 +83,27 @@ jobs:
       - name: Install project
         run: uv sync --extra mypy  # it's okay if this extra does not exist
       - name: Run ty
-        run: uv run --with ty ty check --python-version ${{ matrix.py3 }} --output-format github
+        run: |
+          set -euo pipefail
+          outf="$(mktemp)"
+
+          # run ty -- capture output to file and exit code
+          if uv run --with ty ty check \
+              --python-version ${{ matrix.py3 }} \
+              --output-format github \
+              > "$outf" 2>&1
+          then
+              ty_exit_code=0
+          else
+              ty_exit_code=$?
+          fi
+
+          # dump
+          cat "$outf"
+          ty_error_count="$(grep -c '^::error::' "$outf" || true)"
+          echo "Found $ty_error_count errors."
+
+          exit "$ty_exit_code"
 
   ruff-whole-repo:
     runs-on: ubuntu-latest
@@ -142,7 +162,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Ruff PR-touched lines (stricter than repo-wide)
+      - name: Ruff branch-touched lines (stricter than repo-wide)
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
           RUFF_SELECT: ${{ inputs.ruff-changed-line-rules }}
