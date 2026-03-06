@@ -79,11 +79,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-      - name: run ty check
-        run: |
-          set -euo pipefail
-          uv sync --locked --dev
-          uv run ty check --python-version ${{ matrix.py3 }} --output-format github
+      - run: uv run --with ty ty check --python-version ${{ matrix.py3 }} --output-format github
 
   ruff-whole-repo:
     runs-on: ubuntu-latest
