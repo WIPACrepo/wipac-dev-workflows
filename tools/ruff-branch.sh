@@ -80,7 +80,7 @@ fi
 # Ruff on changed files (no fixes), concise output for filtering
 # - If no formatting violations are found -> exit 0
 ########################################################################
-xargs -r ruff check --select I,F401,FA,UP --output-format concise \
+xargs -r ruff check --select "$RUFF_SELECT" --output-format concise \
     <"${CHANGED_FILES_FILE}" >"${RUFF_OUT}" &&
     echo "No ruff errors" || echo "Found ruff errors"
 # ^^^ xargs feeds the file list into ruff as args
