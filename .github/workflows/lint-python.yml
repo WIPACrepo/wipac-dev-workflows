@@ -87,20 +87,16 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           echo $GITHUB_WORKFLOW_REF
-          ref="$(
-              awk '
-                  $1 == "uses:" && $2 ~ /WIPACrepo\/wipac-dev-workflows\/\.github\/workflows\/lint-python\.yml@/ {
-                      s = $2
-                      sub(/^.*@/, "", s)   # keep only the ref after @
-                      sub(/#.*/, "", s)    # strip inline comments
-                      gsub(/[[:space:]]+$/, "", s)
-                      print s
-                      exit
-                  }
-              ' $GITHUB_WORKFLOW_REF
-          )"
-          [[ -n "${ref}" ]] || { echo "ERROR: could not find here_ref in caller's workflow"; exit 1; }
-          echo $ref
+          caller_ref="${GITHUB_WORKFLOW_REF%%@*}"  # drop "@refs/..."
+          echo $caller_ref
+          caller_wf_path=".github/workflows/${caller_ref##*/.github/workflows/}"  # drop root
+          echo $caller_wf_path
+          here_full="$(grep -oE \
+              '[[:space:]]*uses:[[:space:]]*WIPACrepo/wipac-dev-workflows/\.github/workflows/lint-python\.yml@[[:alnum:]_.\/-]+' \
+              $caller_wf_path | head -n 1)"
+          echo $here_full
+          here_ref="${here_full##*@}"
+          echo $here_ref
           echo "here_ref=${ref}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v6
         with:
@@ -117,4 +113,4 @@ jobs:
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           # note: ruff will use the project's minimum Python version from pyproject.toml
-          .wipac-dev-workflows/tools/ruff-this.sh
+  .wipac-dev-workflows/tools/ruff-this.sh
