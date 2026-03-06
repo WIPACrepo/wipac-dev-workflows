@@ -59,15 +59,18 @@ ruff_rc=0
 ruff check --select "$RUFF_SELECT" --output-format concise \
     "${changed_files[@]}" >"${RUFF_OUT}" || ruff_rc=$?
 
+echo "::group::Raw ruff output"
+cat "${RUFF_OUT}"
+echo "::endgroup::"
+
 if [[ $ruff_rc -eq 0 ]]; then
     echo "No ruff errors."
     exit 0
 elif [[ $ruff_rc -eq 1 ]]; then
     echo "Found ruff errors (will be filtered):"
-    cat "$RUFF_OUT"
+    echo
 else
     echo "ERROR: Ruff failed abnormally with exit code ${ruff_rc}"
-    cat "${RUFF_OUT}"
     exit "$ruff_rc"
 fi
 

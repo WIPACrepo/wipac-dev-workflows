@@ -112,8 +112,8 @@ def main():
             print("::error::" + line)
         print(f"::error::Found {len(keepers)} errors on lines touched by this branch.")
         print(
-            f"::info::Run 'ruff check --select {os.environ['RUFF_SELECT']}"
-            " (--fix|--fix-only) [PATHS]' to auto-fix all issues in file(s)."
+            f"::notice::You can run 'ruff check --select {os.environ['RUFF_SELECT']}"
+            " (--fix|--fix-only) [PATHS]' to auto-fix *all* issues in file(s)."
         )
         sys.exit(1)
     else:
