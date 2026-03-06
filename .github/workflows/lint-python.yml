@@ -63,6 +63,19 @@ jobs:
           python-version: ${{ matrix.py3 }}
       - uses: WIPACrepo/wipac-dev-mypy-action@v2.0
 
+  ty-type-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        py3: ${{ fromJSON(inputs.py-matrix-json) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - uses: astral-sh/setup-uv@v7
+      - run: uvx ty check --python-version ${{ matrix.py3 }} --output-format github
+
   ruff-whole-repo:
     runs-on: ubuntu-latest
     steps:
