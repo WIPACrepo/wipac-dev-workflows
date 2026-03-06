@@ -9,19 +9,19 @@ import sys
 PR_SHAS = set(open(os.environ["PR_SHAS_FILE"]).read().split())
 CHANGED_FILES = [x.strip() for x in open(os.environ["CHANGED_FILES_FILE"]) if x.strip()]
 RUFF_OUT = [x.strip() for x in open(os.environ["RUFF_OUT"]) if x.strip()]
-SURROUNDING_LINES = int(os.environ.get("SURROUNDING_LINES", 0))
+CONTEXT_LINE_RADIUS = int(os.environ.get("CONTEXT_LINE_RADIUS", 0))
 
 
 # regexes
 GIT_BLAME_LINE_PORCELAIN_HEADER_RE = re.compile(
     r"^(?P<sha>[0-9a-f]{40})\s+\d+\s+(?P<final_lineno>\d+)\b"
 )
-RUFF_FILE_LINENO_RE = re.compile(r"^(?P<path>[^:]+):(?P<lineno>\d+):")
+RUFF_FILE_LINENO_RE = re.compile(r"^(?:Error:\s+)?(?P<path>[^:]+):(?P<lineno>\d+):")
 
 
-def get_changed_lines() -> dict[str, set[int]]:
+def get_changed_file_linenos() -> dict[str, set[int]]:
     """Return the files mapped to line-numbers last-touched by this branch."""
-    changed_lines: dict[str, set[int]] = {}
+    changed_file_linenos: dict[str, set[int]] = {}
 
     for path in CHANGED_FILES:
         txt = subprocess.check_output(
@@ -47,14 +47,14 @@ def get_changed_lines() -> dict[str, set[int]]:
                 if m.group("sha") in PR_SHAS:
                     final_lineno = int(m.group("final_lineno"))
                     try:
-                        changed_lines[path].add(final_lineno)
+                        changed_file_linenos[path].add(final_lineno)
                     except KeyError:
-                        changed_lines[path] = {final_lineno}
+                        changed_file_linenos[path] = {final_lineno}
 
-    return changed_lines
+    return changed_file_linenos
 
 
-def filter_ruff_out(changed_lines: dict[str, set[int]]) -> list[str]:
+def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
     """Filter Ruff output to only include diagnostics for lines touched by this branch."""
     keepers = []
 
@@ -63,14 +63,18 @@ def filter_ruff_out(changed_lines: dict[str, set[int]]) -> list[str]:
         # lta/lta_cmd.py:11:8: F401 `copy` imported but unused
         if m := RUFF_FILE_LINENO_RE.match(ruff_line):
             path = m.group("path")
-            if path not in changed_lines:
+            if path not in changed_file_linenos:
                 continue
             lineno = int(m.group("lineno"))
-            if lineno in changed_lines[path]:
+            # is this line touched by this branch?
+            if lineno in changed_file_linenos[path]:
                 keepers.append(ruff_line)
-            elif any(
-                x in changed_lines[path]
-                for x in range(lineno - SURROUNDING_LINES, lineno + SURROUNDING_LINES)
+            # else, is this line near a line touched by this branch?
+            elif CONTEXT_LINE_RADIUS > 0 and any(
+                x in changed_file_linenos[path]
+                for x in range(
+                    lineno - CONTEXT_LINE_RADIUS, lineno + CONTEXT_LINE_RADIUS + 1
+                )
             ):
                 keepers.append(ruff_line)
 
@@ -80,14 +84,15 @@ def filter_ruff_out(changed_lines: dict[str, set[int]]) -> list[str]:
 def main():
     """Main."""
     # 1: get changed lines
-    changed_lines = get_changed_lines()
+    changed_file_linenos = get_changed_file_linenos()
     print("Changed lines:")
-    for line in sorted(changed_lines):
-        print(line)
+    for p in sorted(changed_file_linenos):
+        for n in sorted(changed_file_linenos[p]):
+            print(f"{p}:{n}")
     print()
 
     # 2: filter ruff output for only those lines
-    keepers = filter_ruff_out(changed_lines)
+    keepers = filter_ruff_out(changed_file_linenos)
     print("Ruff issues on lines last-touched by this branch:")
     if keepers:
         for line in keepers:
