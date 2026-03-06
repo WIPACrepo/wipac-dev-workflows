@@ -88,6 +88,7 @@ jobs:
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           # Example:
           #   WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@refs/heads/linters
+          echo $GITHUB_WORKFLOW_REF
           workflow_ref="${GITHUB_WORKFLOW_REF#*@}"
           echo "$workflow_ref"
           echo "here_ref=${workflow_ref}" >> "$GITHUB_OUTPUT"
