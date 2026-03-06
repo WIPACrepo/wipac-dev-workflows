@@ -53,16 +53,21 @@ fi
 
 ########################################################################
 # Ruff on changed files (no fixes), concise output for filtering
-# - If no formatting violations are found -> exit 0
 ########################################################################
+ruff_rc=0
 xargs -r ruff check --select "$RUFF_SELECT" --output-format concise \
-    <"${CHANGED_FILES_FILE}" >"${RUFF_OUT}" &&
-    echo "No ruff errors" || echo "Found ruff errors"
-# ^^^ xargs feeds the file list into ruff as args
+    <"${CHANGED_FILES_FILE}" >"${RUFF_OUT}" || ruff_rc=$?
 
-echo "Raw ruff output (will be paired down):"
-cat "$RUFF_OUT"
-echo
+if [[ $ruff_rc -eq 0 ]]; then
+    echo "No ruff errors"
+    exit 0
+elif [[ $ruff_rc -eq 1 ]]; then
+    echo "Found ruff errors"
+else
+    echo "ERROR: Ruff failed abnormally with exit code ${ruff_rc}"
+    cat "$RUFF_OUT"
+    exit "$ruff_rc"
+fi
 
 ########################################################################
 # Filter Ruff output using script

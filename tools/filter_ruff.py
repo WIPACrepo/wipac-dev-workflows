@@ -21,7 +21,7 @@ GIT_BLAME_LINE_PORCELAIN_HEADER_RE = re.compile(
 RUFF_FILE_LINENO_RE = re.compile(r"^(?:Error:\s+)?(?P<path>[^:]+):(?P<lineno>\d+):")
 
 
-def get_changed_file_linenos(branch_shas: list[str]) -> dict[str, set[int]]:
+def get_changed_file_linenos(branch_shas: set[str]) -> dict[str, set[int]]:
     """Return the files mapped to line-numbers last-touched by this branch."""
     changed_file_linenos: dict[str, set[int]] = {}
 
@@ -86,10 +86,12 @@ def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
 def main():
     """Main."""
     # 0. Get all the SHAs of the commits in this branch
-    branch_shas = subprocess.check_output(
-        ["git", "rev-list", f"{MERGE_BASE}..{HEAD_SHA}"],
-        text=True,
-    ).splitlines()
+    branch_shas = set(
+        subprocess.check_output(
+            ["git", "rev-list", f"{MERGE_BASE}..{HEAD_SHA}"],
+            text=True,
+        ).splitlines()
+    )
     print("Commit SHAs for this Branch:")
     pprint.pprint(branch_shas)
     print()
