@@ -9,12 +9,14 @@ import sys
 PR_SHAS = set(open(os.environ["PR_SHAS_FILE"]).read().split())
 CHANGED_FILES = [x.strip() for x in open(os.environ["CHANGED_FILES_FILE"]) if x.strip()]
 RUFF_OUT = [x.strip() for x in open(os.environ["RUFF_OUT"]) if x.strip()]
+SURROUNDING_LINES = int(os.environ.get("SURROUNDING_LINES", 0))
 
 
 # regexes
 GIT_BLAME_LINE_PORCELAIN_HEADER_RE = re.compile(
     r"^(?P<sha>[0-9a-f]{40})\s+\d+\s+(?P<final_lineno>\d+)\b"
 )
+RUFF_FILE_LINENO_RE = re.compile(r"^(?P<path>[^:]+):(?P<lineno>\d+):")
 
 
 def get_changed_lines() -> dict[str, set[int]]:
@@ -41,15 +43,13 @@ def get_changed_lines() -> dict[str, set[int]]:
             #         import asyncio
             # 46db3ed19651652e6b875dffd1b15533f030d9f2 7 7 1
             # ...
-            m = GIT_BLAME_LINE_PORCELAIN_HEADER_RE.match(line)
-            if not m:
-                continue
-            if m.group("sha") in PR_SHAS:
-                final_lineno = int(m.group("final_lineno"))
-                try:
-                    changed_lines[path].add(final_lineno)
-                except KeyError:
-                    changed_lines[path] = {final_lineno}
+            if m := GIT_BLAME_LINE_PORCELAIN_HEADER_RE.match(line):
+                if m.group("sha") in PR_SHAS:
+                    final_lineno = int(m.group("final_lineno"))
+                    try:
+                        changed_lines[path].add(final_lineno)
+                    except KeyError:
+                        changed_lines[path] = {final_lineno}
 
     return changed_lines
 
@@ -61,9 +61,18 @@ def filter_ruff_out(changed_lines: dict[str, set[int]]) -> list[str]:
     for ruff_line in RUFF_OUT:
         # Ex:
         # lta/lta_cmd.py:11:8: F401 `copy` imported but unused
-        path, lineno = ruff_line.split(":")[:2]
-        if path in changed_lines and int(lineno) in changed_lines[path]:
-            keepers.append(ruff_line)
+        if m := RUFF_FILE_LINENO_RE.match(ruff_line):
+            path = m.group("path")
+            if path not in changed_lines:
+                continue
+            lineno = int(m.group("lineno"))
+            if lineno in changed_lines[path]:
+                keepers.append(ruff_line)
+            elif any(
+                x in changed_lines[path]
+                for x in range(lineno - SURROUNDING_LINES, lineno + SURROUNDING_LINES)
+            ):
+                keepers.append(ruff_line)
 
     return keepers
 
