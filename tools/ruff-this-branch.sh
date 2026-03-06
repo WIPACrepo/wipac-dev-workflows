@@ -42,7 +42,7 @@ RUFF_OUT="$(mktemp)"
 ########################################################################
 git diff --name-only --diff-filter=ACMRT "${MERGE_BASE}..${HEAD_SHA}" -- '*.py' >"${CHANGED_FILES_FILE}"
 if [[ ! -s ${CHANGED_FILES_FILE} ]]; then
-    echo "No changed Python files."
+    echo "::notice::No changed Python files."
     exit 0
 else
     echo "::group::Changed files"
@@ -63,7 +63,7 @@ cat "${RUFF_OUT}"
 echo "::endgroup::"
 
 if [[ $ruff_rc -eq 0 ]]; then
-    echo "::info::No ruff errors."
+    echo "::notice::No ruff errors."
     exit 0
 elif [[ $ruff_rc -eq 1 ]]; then
     echo "Found ruff errors (will be filtered)"

@@ -30,17 +30,17 @@ on:
         required: false
         default: 50
         type: number
-      ruff-changed-line-radius:
+      ruff-modernize-changed-line-radius:
         description: |
-          ** USED IN JOB THAT IS ONLY RUN ON NON-DEFAULT BRANCHES **
-          How many lines on each side of the branch's changed lines to pull in for Ruff
+          ** USED BY 'ruff-modernize' -- ONLY RUN ON NON-DEFAULT BRANCHES **
+          How many lines on each side of the branch's changed lines to pull in for ruff
         required: false
         default: 2
         type: number
-      ruff-changed-line-rules:
+      ruff-modernize-rules:
         description: |
-          ** USED IN JOB THAT IS ONLY RUN ON NON-DEFAULT BRANCHES **
-          Which Ruff rules to lint for branch's changed lines
+          ** USED BY 'ruff-modernize' -- ONLY RUN ON NON-DEFAULT BRANCHES **
+          Which Ruff rules to lint for branch's changed lines (stricter than repo-wide job)
         required: false
         default: "I,UP,FA"
         type: string
@@ -63,7 +63,7 @@ jobs:
           python-version: ${{ matrix.py3 }}
       - uses: WIPACrepo/wipac-dev-mypy-action@v2.0
 
-  ty-type-check:
+  ty:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -87,25 +87,25 @@ jobs:
           set -euo pipefail
           outf="$(mktemp)"
 
-          # run ty -- capture output to file and exit code
+          # run -- capture output to file and exit code
           if uv run --with ty ty check \
               --python-version ${{ matrix.py3 }} \
               --output-format github \
               > "$outf" 2>&1
           then
-              ty_exit_code=0
+              exit_code=0
           else
-              ty_exit_code=$?
+              exit_code=$?
           fi
 
           # dump
           cat "$outf"
-          ty_error_count="$(grep -c '^::error' "$outf" || true)"
-          echo "Found $ty_error_count errors."
+          error_count="$(grep -c '^::error' "$outf" || true)"
+          echo "::notice::Found $error_count errors."
 
-          exit "$ty_exit_code"
+          exit "$exit_code"
 
-  ruff-whole-repo:
+  ruff:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -121,15 +121,32 @@ jobs:
           MAX_STATEMENTS: ${{ inputs.max-statements }}
         run: |
           set -euo pipefail
+          outf="$(mktemp)"
+          
           # note: ruff will use the project's minimum Python version from pyproject.toml
-          ruff check \
+
+          # run -- capture output to file and exit code
+          if ruff check \
               --output-format github \
               --extend-select C901,PLR0915 \
               --config "lint.mccabe.max-complexity=${MAX_COMPLEXITY}" \
               --config "lint.pylint.max-statements=${MAX_STATEMENTS}" \
-              .
+              . \
+              > "$outf" 2>&1
+          then
+              exit_code=0
+          else
+              exit_code=$?
+          fi
 
-  ruff-branch-changes:
+          # dump
+          cat "$outf"
+          error_count="$(grep -c '^::error' "$outf" || true)"
+          echo "::notice::Found $error_count errors."
+
+          exit "$exit_code"
+
+  ruff-modernize:
     # Only run on non-default branches
     if: ${{ github.ref_type == 'branch' && (github.head_ref || github.ref_name) != inputs.default-branch }}
     runs-on: ubuntu-latest
@@ -162,11 +179,11 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Ruff branch-touched lines (stricter than repo-wide)
+      - name: Ruff branch-touched lines (stricter rules than repo-wide job)
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
-          RUFF_SELECT: ${{ inputs.ruff-changed-line-rules }}
-          CHANGED_LINE_RADIUS: ${{ inputs.ruff-changed-line-radius }}
+          RUFF_SELECT: ${{ inputs.ruff-modernize-rules }}
+          CHANGED_LINE_RADIUS: ${{ inputs.ruff-modernize-changed-line-radius }}
         run: |
           set -euo pipefail
           # note: ruff will use the project's minimum Python version from pyproject.toml
