@@ -7,12 +7,10 @@ echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
 ########################################################################
 # Required Inputs
 ########################################################################
-
 if [[ -z ${RUFF_SELECT:-} ]]; then
     echo "ERROR: Env var 'RUFF_SELECT' must be defined (example: I,F401,FA,UP)"
     exit 1
 fi
-export RUFF_SELECT
 
 if [[ -z ${DEFAULT_BRANCH:-} ]]; then
     echo "ERROR: Env var 'DEFAULT_BRANCH' must be defined"
@@ -24,15 +22,13 @@ fi
 ########################################################################
 git fetch origin --prune --no-tags
 HEAD_SHA="$(git rev-parse HEAD)"
-BASE_REF="origin/${DEFAULT_BRANCH}"
-MERGE_BASE="$(git merge-base "$BASE_REF" "$HEAD_SHA")"
+MERGE_BASE="$(git merge-base "origin/${DEFAULT_BRANCH}" "$HEAD_SHA")"
 
 ########################################################################
 # Dump
 ########################################################################
 echo "RUFF_SELECT=${RUFF_SELECT}"
 echo "DEFAULT_BRANCH=${DEFAULT_BRANCH}"
-echo "BASE_REF=${BASE_REF}"
 echo "HEAD_SHA=${HEAD_SHA}"
 echo "MERGE_BASE=${MERGE_BASE}"
 
