@@ -9,8 +9,8 @@ import sys
 # env vars
 HEAD_SHA = os.environ["HEAD_SHA"]
 MERGE_BASE = os.environ["MERGE_BASE"]
-CONTEXT_LINE_RADIUS = int(os.environ.get("CONTEXT_LINE_RADIUS", 0))
-print(f"{CONTEXT_LINE_RADIUS=}")
+CHANGED_LINE_RADIUS = int(os.environ.get("CHANGED_LINE_RADIUS", 0))
+print(f"{CHANGED_LINE_RADIUS=}")
 # -- files
 CHANGED_FILES = [x.strip() for x in open(os.environ["CHANGED_FILES_FILE"]) if x.strip()]
 RUFF_OUT = [x.strip() for x in open(os.environ["RUFF_OUT"]) if x.strip()]
@@ -74,10 +74,10 @@ def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
             if lineno in changed_file_linenos[path]:
                 keepers.append(ruff_line)
             # else, is this line near a line touched by this branch?
-            elif CONTEXT_LINE_RADIUS > 0 and any(
+            elif CHANGED_LINE_RADIUS > 0 and any(
                 x in changed_file_linenos[path]
                 for x in range(
-                    lineno - CONTEXT_LINE_RADIUS, lineno + CONTEXT_LINE_RADIUS + 1
+                    lineno - CHANGED_LINE_RADIUS, lineno + CHANGED_LINE_RADIUS + 1
                 )
             ):
                 keepers.append(ruff_line)

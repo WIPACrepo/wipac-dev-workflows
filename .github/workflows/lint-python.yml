@@ -110,7 +110,7 @@ jobs:
         env:
           DEFAULT_BRANCH: ${{ inputs.default-branch }}
           RUFF_SELECT: "I,UP,FA"
-          SURROUNDING_LINES: 3  # how many lines on each side to pull in?
+          CHANGED_LINE_RADIUS: 3  # how many lines on each side to pull in?
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
           # note: ruff will use the project's minimum Python version from pyproject.toml
