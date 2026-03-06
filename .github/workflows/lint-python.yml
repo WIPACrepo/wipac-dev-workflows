@@ -82,7 +82,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
-      - name: Determine reusable workflow ref
+      - name: Determine reusable workflow ref (somehow not provided by a GHA macro)
         id: here
         run: |
           set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
