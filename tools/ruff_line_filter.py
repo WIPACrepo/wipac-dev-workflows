@@ -94,15 +94,15 @@ def main():
             text=True,
         ).splitlines()
     )
-    print("Commit SHAs for this Branch:")
+    print("::group::Commit SHAs for this Branch")
     pprint.pprint(branch_shas)
-    print()
+    print("::endgroup::")
 
     # 1: Get changed lines
     changed_file_linenos = get_changed_file_linenos(branch_shas)
-    print("Changed lines:")
+    print("::group::Changed lines")
     pprint.pprint(changed_file_linenos)
-    print()
+    print("::endgroup::")
 
     # 2: Filter ruff output for only those lines -> print for GitHub Actions
     keepers = filter_ruff_out(changed_file_linenos)

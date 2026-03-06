@@ -46,9 +46,9 @@ if [[ ! -s ${CHANGED_FILES_FILE} ]]; then
     echo "No changed Python files."
     exit 0
 else
-    echo "Changed files:"
+    echo "::group::Changed files"
     cat "$CHANGED_FILES_FILE"
-    echo
+    echo "::endgroup::"
 fi
 
 ########################################################################
