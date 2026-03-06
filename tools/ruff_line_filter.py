@@ -9,9 +9,11 @@ import sys
 # env vars
 HEAD_SHA = os.environ["HEAD_SHA"]
 MERGE_BASE = os.environ["MERGE_BASE"]
+CONTEXT_LINE_RADIUS = int(os.environ.get("CONTEXT_LINE_RADIUS", 0))
+print(f"{CONTEXT_LINE_RADIUS=}")
+# -- files
 CHANGED_FILES = [x.strip() for x in open(os.environ["CHANGED_FILES_FILE"]) if x.strip()]
 RUFF_OUT = [x.strip() for x in open(os.environ["RUFF_OUT"]) if x.strip()]
-CONTEXT_LINE_RADIUS = int(os.environ.get("CONTEXT_LINE_RADIUS", 0))
 
 
 # regexes
