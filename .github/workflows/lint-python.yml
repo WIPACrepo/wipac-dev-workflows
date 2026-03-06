@@ -97,7 +97,7 @@ jobs:
           echo $here_full
           here_ref="${here_full##*@}"
           echo $here_ref
-          echo "here_ref=${ref}" >> "$GITHUB_OUTPUT"
+          echo "here_ref=${here_ref}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v6
         with:
           repository: WIPACrepo/wipac-dev-workflows  # aka, here
