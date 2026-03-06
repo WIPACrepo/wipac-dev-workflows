@@ -82,10 +82,19 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - name: Determine reusable workflow ref
+        id: here
+        run: |
+          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          # Example:
+          #   WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@refs/heads/linters
+          workflow_ref="${GITHUB_WORKFLOW_REF#*@}"
+          echo "$workflow_ref"
+          echo "here_ref=${workflow_ref}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v6
         with:
           repository: WIPACrepo/wipac-dev-workflows  # aka, here
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ steps.here.outputs.here_ref }}
           path: .wipac-dev-workflows
       - uses: astral-sh/ruff-action@v3
         with:
