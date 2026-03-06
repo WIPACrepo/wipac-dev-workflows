@@ -54,9 +54,10 @@ fi
 ########################################################################
 # Ruff on changed files (no fixes), concise output for filtering
 ########################################################################
+mapfile -t changed_files <"${CHANGED_FILES_FILE}" # use array since xargs changes return value
 ruff_rc=0
-xargs -r ruff check --select "$RUFF_SELECT" --output-format concise \
-    <"${CHANGED_FILES_FILE}" >"${RUFF_OUT}" || ruff_rc=$?
+ruff check --select "$RUFF_SELECT" --output-format concise \
+    "${changed_files[@]}" >"${RUFF_OUT}" || ruff_rc=$?
 
 if [[ $ruff_rc -eq 0 ]]; then
     echo "No ruff errors."
@@ -66,7 +67,7 @@ elif [[ $ruff_rc -eq 1 ]]; then
     cat "$RUFF_OUT"
 else
     echo "ERROR: Ruff failed abnormally with exit code ${ruff_rc}"
-    cat "$RUFF_OUT"
+    cat "${RUFF_OUT}"
     exit "$ruff_rc"
 fi
 
