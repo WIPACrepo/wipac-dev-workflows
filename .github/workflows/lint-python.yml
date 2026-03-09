@@ -32,14 +32,14 @@ on:
         type: number
       ruff-modernize-changed-line-radius:
         description: |
-          ** USED BY 'ruff-modernize' -- ONLY RUN ON NON-DEFAULT BRANCHES **
+          ** USED BY 'ruff-modernize' -- ONLY RUNS ON NON-DEFAULT BRANCHES **
           How many lines on each side of the branch's changed lines to pull in for ruff
         required: false
         default: 2
         type: number
       ruff-modernize-rules:
         description: |
-          ** USED BY 'ruff-modernize' -- ONLY RUN ON NON-DEFAULT BRANCHES **
+          ** USED BY 'ruff-modernize' -- ONLY RUNS ON NON-DEFAULT BRANCHES **
           Which Ruff rules to lint for branch's changed lines (stricter than repo-wide job)
         required: false
         default: "I,UP,FA"
