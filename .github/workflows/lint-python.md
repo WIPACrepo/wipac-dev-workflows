@@ -35,7 +35,6 @@ This workflow currently provides:
 
 | Name             | Description                                                                                                               |
 |------------------|---------------------------------------------------------------------------------------------------------------------------|
-| `default-branch` | Your repo's default branch (e.g., `main`).                                                                                |
 | `py-matrix-json` | The JSON string of the matrix of Python versions to lint against.<br>HINT: Use `${{ needs.py-versions.outputs.matrix }}`. |
 
 ### Optional
@@ -71,7 +70,6 @@ jobs:
     needs: [ py-versions ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@...
     with:
-      default-branch: ${{ github.event.repository.default_branch }}
       py-matrix-json: ${{ needs.py-versions.outputs.matrix }}  # ["3.10", ...] 
 ```
 
@@ -89,7 +87,6 @@ jobs:
     needs: [ py-versions, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@v...
     with:
-      default-branch: ${{ github.event.repository.default_branch }}
       py-matrix-json: ${{ needs.py-versions.outputs.matrix }}
       max-complexity: 11
       max-statements: 65
@@ -109,7 +106,6 @@ jobs:
     needs: [ py-versions, ... ]
     uses: WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@v...
     with:
-      default-branch: ${{ github.event.repository.default_branch }}
       py-matrix-json: ${{ needs.py-versions.outputs.matrix }}
       ruff-modernize-changed-line-radius: 0
       ruff-modernize-rules: UP
