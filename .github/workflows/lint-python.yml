@@ -84,12 +84,15 @@ jobs:
           msg="::error::Found Flake8 config but no Ruff config. Please migrate Flake8 config to [tool.ruff] in pyproject.toml."
           if [[ -f .flake8 ]]; then
               echo "$msg"
+              echo "::notice::flake8 config found: .flake8"
               exit 1
           elif [[ -f setup.cfg ]] && grep -Eq '^[[:space:]]*\[flake8]' setup.cfg; then
               echo "$msg"
+              echo "::notice::flake8 config found: setup.cfg"
               exit 1
           elif [[ -f tox.ini ]] && grep -Eq '^[[:space:]]*\[flake8]' tox.ini; then
               echo "$msg"
+              echo "::notice::flake8 config found: tox.ini"
               exit 1
           else
               echo "OK: No Ruff or Flake8 config found."
@@ -111,12 +114,15 @@ jobs:
           msg="::error::Found mypy config but no ty config. Please migrate mypy config to [tool.ty] in pyproject.toml."
           if [[ -f mypy.ini || -f .mypy.ini ]]; then
               echo "$msg"
+              echo "::notice::mypy config found: mypy.ini"
               exit 1
           elif [[ -f setup.cfg ]] && grep -Eq '^[[:space:]]*\[mypy]' setup.cfg; then
               echo "$msg"
+              echo "::notice::mypy config found: setup.cfg"
               exit 1
           elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.mypy]' pyproject.toml; then
               echo "$msg"
+              echo "::notice::mypy config found: pyproject.toml"
               exit 1
           else
               echo "OK: No ty or mypy config found."
