@@ -63,7 +63,7 @@ jobs:
           python-version: ${{ matrix.py3 }}
       - uses: WIPACrepo/wipac-dev-mypy-action@v2.0
 
-  linter-config-compatibility:
+  config-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
