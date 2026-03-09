@@ -165,6 +165,7 @@ jobs:
           # dump
           cat "$outf"
           error_count="$(grep -c '^::error::' "$outf" || true)"
+          echo "grep result: $error_count"
           if [[ "$error_count" -gt 0 ]]; then
               echo "::error::Found $error_count errors."
           else
@@ -210,6 +211,7 @@ jobs:
           # dump
           cat "$outf"
           error_count="$(grep -c '^::error' "$outf" || true)"
+          echo "grep result: $error_count"
           if [[ "$error_count" -gt 0 ]]; then
               echo "::error::Found $error_count errors."
           else
