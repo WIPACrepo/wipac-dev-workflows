@@ -83,7 +83,7 @@ jobs:
           fi
           
           # no ruff config -> check for flake8 config -> if so, alert user to migrate
-          msg="::error::Found Flake8 config but no Ruff config. Please migrate Flake8 config to `[tool.ruff]`/`[tool.ruff.lint]` in pyproject.toml: https://docs.astral.sh/ruff/configuration/"
+          msg="::error::Found Flake8 config but no Ruff config. Please migrate Flake8 config to \`[tool.ruff]\`/\`[tool.ruff.lint]\` in pyproject.toml: https://docs.astral.sh/ruff/configuration/"
           if [[ -f .flake8 ]]; then
               echo "$msg"
               echo "::notice::flake8 config found: .flake8"
@@ -115,7 +115,7 @@ jobs:
           fi 
           
           # no ty config -> check for mypy config -> if so, alert user to migrate
-          msg="::error::Found mypy config but no ty config. Please migrate mypy config to `[tool.ty]` in pyproject.toml: https://docs.astral.sh/ty/configuration/"
+          msg="::error::Found mypy config but no ty config. Please migrate mypy config to \`[tool.ty]\` in pyproject.toml: https://docs.astral.sh/ty/configuration/"
           if [[ -f mypy.ini || -f .mypy.ini ]]; then
               echo "$msg"
               echo "::notice::mypy config found: mypy.ini"
