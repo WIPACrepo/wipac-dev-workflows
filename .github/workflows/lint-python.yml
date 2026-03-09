@@ -75,8 +75,10 @@ jobs:
           
           # check for either ruff config in project -> if so, all good
           if [[ -f .ruff.toml || -f ruff.toml ]]; then
+              echo "OK: Found Ruff config: .ruff.toml or ruff.toml"
               exit 0
           elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.ruff(\.|])' pyproject.toml; then
+              echo "OK: Found Ruff config: [tool.ruff] in pyproject.toml"
               exit 0
           fi
           
@@ -105,8 +107,10 @@ jobs:
           
           # check for either ty config in project -> if so, all good
           if [[ -f ty.toml ]]; then
+              echo "OK: Found ty config: ty.toml"
               exit 0
           elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.ty(\.|])' pyproject.toml; then
+              echo "OK: Found ty config: [tool.ty] in pyproject.toml" 
               exit 0
           fi 
           
