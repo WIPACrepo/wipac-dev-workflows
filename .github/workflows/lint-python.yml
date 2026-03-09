@@ -63,6 +63,66 @@ jobs:
           python-version: ${{ matrix.py3 }}
       - uses: WIPACrepo/wipac-dev-mypy-action@v2.0
 
+  linter-config-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - name: "ruff-flake8 config check (migrating from flake8 to ruff)"
+        run: |
+          set -euo pipefail
+          
+          # check for either ruff config in project -> if so, all good
+          if [[ -f .ruff.toml || -f ruff.toml ]]; then
+              exit 0
+          elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.ruff(\.|])' pyproject.toml; then
+              exit 0
+          fi
+          
+          # no ruff config -> check for flake8 config -> if so, alert user to migrate
+          msg="::error::Found Flake8 config but no Ruff config. Please migrate Flake8 config to [tool.ruff] in pyproject.toml."
+          if [[ -f .flake8 ]]; then
+              echo "$msg"
+              exit 1
+          elif [[ -f setup.cfg ]] && grep -Eq '^[[:space:]]*\[flake8]' setup.cfg; then
+              echo "$msg"
+              exit 1
+          elif [[ -f tox.ini ]] && grep -Eq '^[[:space:]]*\[flake8]' tox.ini; then
+              echo "$msg"
+              exit 1
+          else
+              echo "OK: No Ruff or Flake8 config found."
+              exit 0
+          fi
+
+      - name: "ty-mypy config check (migrating from mypy to ty)"
+        run: |
+          set -euo pipefail
+          
+          # check for either ty config in project -> if so, all good
+          if [[ -f ty.toml ]]; then
+              exit 0
+          elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.ty(\.|])' pyproject.toml; then
+              exit 0
+          fi 
+          
+          # no ty config -> check for mypy config -> if so, alert user to migrate
+          msg="::error::Found mypy config but no ty config. Please migrate mypy config to [tool.ty] in pyproject.toml."
+          if [[ -f mypy.ini || -f .mypy.ini ]]; then
+              echo "$msg"
+              exit 1
+          elif [[ -f setup.cfg ]] && grep -Eq '^[[:space:]]*\[mypy]' setup.cfg; then
+              echo "$msg"
+              exit 1
+          elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.mypy]' pyproject.toml; then
+              echo "$msg"
+              exit 1
+          else
+              echo "OK: No ty or mypy config found."
+              exit 0
+          fi  
+
   ty:
     runs-on: ubuntu-latest
     strategy:
