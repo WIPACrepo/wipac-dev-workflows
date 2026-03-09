@@ -117,7 +117,7 @@ def main():
     if keepers:
         for line in keepers:
             print("::error::" + line)
-        print(f"::notice::Found {len(keepers)} errors.")
+        print(f"::error::Found {len(keepers)} errors.")
         print(
             f"::notice::You can run `ruff check --select {os.environ['RUFF_SELECT']}"
             " (--fix|--fix-only) [PATHS]` to auto-fix *all* issues in file(s)."

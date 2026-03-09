@@ -170,8 +170,12 @@ jobs:
 
           # dump
           cat "$outf"
-          error_count="$(grep -c '^::error' "$outf" || true)"
-          echo "::notice::Found $error_count errors."
+          error_count="$(grep -c '^::error::' "$outf" || true)"
+          if [[ "$error_count" -gt 0 ]]; then
+              echo "::error::Found $error_count errors."
+          else
+              echo "::notice::No errors found."
+          fi
 
           exit "$exit_code"
 
@@ -212,7 +216,11 @@ jobs:
           # dump
           cat "$outf"
           error_count="$(grep -c '^::error' "$outf" || true)"
-          echo "::notice::Found $error_count errors."
+          if [[ "$error_count" -gt 0 ]]; then
+              echo "::error::Found $error_count errors."
+          else
+              echo "::notice::No errors found."
+          fi
 
           exit "$exit_code"
 
