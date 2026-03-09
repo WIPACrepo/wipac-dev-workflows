@@ -3,6 +3,12 @@ name: lint-python.yml
 on:
   workflow_call:
     inputs:
+      default-branch:
+        description: |
+          Your repo's default branch (e.g., main)
+          HINT: Use '$ {{ github.event.repository.default_branch }}' (no space after $)
+        required: true
+        type: string
       py-matrix-json:
         description: |
           The JSON string of the matrix of Python versions to lint against
@@ -220,7 +226,7 @@ jobs:
 
   ruff-modernize:
     # Only run on non-default branches
-    if: ${{ github.ref_type == 'branch' && (github.head_ref || github.ref_name) != github.event.repository.default_branch }}
+    if: ${{ github.ref_type == 'branch' && (github.head_ref || github.ref_name) != inputs.default-branch }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -253,7 +259,7 @@ jobs:
           args: "--version"  # noop, just install ruff
       - name: Ruff branch-touched lines (stricter rules than repo-wide job)
         env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DEFAULT_BRANCH: ${{ inputs.default-branch }}
           RUFF_SELECT: ${{ inputs.ruff-modernize-rules }}
           CHANGED_LINE_RADIUS: ${{ inputs.ruff-modernize-changed-line-radius }}
         run: |
