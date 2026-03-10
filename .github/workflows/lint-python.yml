@@ -171,10 +171,14 @@ jobs:
           echo "grep result: $error_count"
           if [[ "$error_count" -gt 0 ]]; then
               echo "::error::Found $error_count errors."
+              # -- run with full output (includes the caret-arrows pointing to the offending code) 
+              echo "::group::Full ty output with richer error info (click to expand)" 
+              uv run --with ty ty check --python-version ${{ matrix.py3 }} --output-format full || true
+              echo "::endgroup::"
           else
               echo "::notice::No errors found."
           fi
-
+          
           exit "$exit_code"
 
   ruff:
