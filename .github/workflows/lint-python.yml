@@ -153,13 +153,15 @@ jobs:
         run: |
           set -euo pipefail
           outf="$(mktemp)"
+          
+          # use a var so we can run the command 2x (array for quoting reasons)
+          cmd=(
+              uv run --with ty ty check
+              --python-version ${{ matrix.py3 }}
+          )
 
           # run -- capture output to file and exit code
-          if uv run --with ty ty check \
-              --python-version ${{ matrix.py3 }} \
-              --output-format github \
-              > "$outf" 2>&1
-          then
+          if "${cmd[@]}" --output-format github > "$outf" 2>&1; then
               exit_code=0
           else
               exit_code=$?
@@ -171,9 +173,8 @@ jobs:
           echo "grep result: $error_count"
           if [[ "$error_count" -gt 0 ]]; then
               echo "::error::Found $error_count errors."
-              # -- run with full output (includes the caret-arrows pointing to the offending code) 
-              echo "::group::Full ty output with richer error info (click to expand)" 
-              uv run --with ty ty check --python-version ${{ matrix.py3 }} --output-format full || true
+              echo "::group::Full ty output with richer error info, like arrows (click to expand)" 
+              "${cmd[@]}" --output-format full || true 
               echo "::endgroup::"
           else
               echo "::notice::No errors found."
@@ -200,27 +201,32 @@ jobs:
           outf="$(mktemp)"
           
           # note: ruff will use the project's minimum Python version from pyproject.toml
-
+          
+          # use a var so we can run the command 2x (array for quoting reasons)
+          cmd=(
+              ruff check
+              --extend-select C901,PLR0915
+              --config "lint.mccabe.max-complexity=${MAX_COMPLEXITY}"
+              --config "lint.pylint.max-statements=${MAX_STATEMENTS}"
+              .
+          )
+          
           # run -- capture output to file and exit code
-          if ruff check \
-              --output-format github \
-              --extend-select C901,PLR0915 \
-              --config "lint.mccabe.max-complexity=${MAX_COMPLEXITY}" \
-              --config "lint.pylint.max-statements=${MAX_STATEMENTS}" \
-              . \
-              > "$outf" 2>&1
-          then
+          if "${cmd[@]}" --output-format github > "$outf" 2>&1; then
               exit_code=0
           else
               exit_code=$?
           fi
-
+          
           # dump
           cat "$outf"
           error_count="$(grep -c '^::error' "$outf" || true)"
           echo "grep result: $error_count"
           if [[ "$error_count" -gt 0 ]]; then
               echo "::error::Found $error_count errors."
+              echo "::group::Full ruff output with richer error info, like arrows (click to expand)" 
+              "${cmd[@]}" --output-format full || true
+              echo "::endgroup::"
           else
               echo "::notice::No errors found."
           fi
