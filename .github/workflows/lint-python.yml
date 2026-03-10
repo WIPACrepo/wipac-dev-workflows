@@ -192,7 +192,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Ruff base (repo-wide; respect repo config)
+      - name: Run ruff (repo-wide; respect repo config)
         env:
           MAX_COMPLEXITY: ${{ inputs.max-complexity }}
           MAX_STATEMENTS: ${{ inputs.max-statements }}
@@ -266,7 +266,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Ruff branch-touched lines (stricter rules than repo-wide job)
+      - name: Run ruff (branch-touched lines; stricter rules than repo-wide job)
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           RUFF_SELECT: ${{ inputs.ruff-modernize-rules }}
