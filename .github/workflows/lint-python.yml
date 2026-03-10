@@ -41,6 +41,7 @@ on:
 
 jobs:
 
+  # FUTURE DEV: remove once ty is out of beta
   mypy:
     runs-on: ubuntu-latest
     strategy:
@@ -55,7 +56,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.py3 }}
-      - uses: WIPACrepo/wipac-dev-mypy-action@v2.0
+      - uses: WIPACrepo/wipac-dev-mypy-action@v3.0
+        with:
+          _no_deprecation: true
 
   config-checks:
     runs-on: ubuntu-latest
