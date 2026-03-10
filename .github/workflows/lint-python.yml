@@ -149,7 +149,7 @@ jobs:
           enable-cache: true
       - name: Install project
         run: uv sync --extra mypy  # it's okay if this extra does not exist
-      - name: Run ty
+      - name: Run ty — repo-wide; use project config (if applicable, else default rules)
         run: |
           set -euo pipefail
           outf="$(mktemp)"
@@ -192,7 +192,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Run ruff — repo-wide; use project's config (if present, else default rules)
+      - name: Run ruff — repo-wide; use project config (if applicable, else default rules)
         env:
           MAX_COMPLEXITY: ${{ inputs.max-complexity }}
           MAX_STATEMENTS: ${{ inputs.max-statements }}
@@ -266,7 +266,7 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: "--version"  # noop, just install ruff
-      - name: Run ruff — on branch-touched lines; use stricter rules + project's config (if present)
+      - name: Run ruff — on branch-touched lines; use project config (if applicable) + stricter rules
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           RUFF_SELECT: ${{ inputs.ruff-modernize-rules }}
