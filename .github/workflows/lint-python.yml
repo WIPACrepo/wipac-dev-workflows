@@ -63,6 +63,19 @@ jobs:
   config-checks:
     runs-on: ubuntu-latest
     steps:
+      - name: "check if ty is now out of beta"
+        run: |
+          set -euo pipefail
+          if curl -fsSL https://pypi.org/pypi/ty/json | jq -e '
+              (.info.classifiers // [])
+              | index("Development Status :: 4 - Beta")
+              | not
+          ' > /dev/null
+          then
+              echo "::warning::ty is out of beta! no need to run mypy — contact admins"
+          else
+              echo "ty is still beta, proceeding to run mypy and ty jobs"
+          fi
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
