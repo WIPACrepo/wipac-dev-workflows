@@ -60,13 +60,13 @@ def get_changed_file_linenos(branch_shas: set[str]) -> dict[str, set[int]]:
 
 def filter_ruff_out(
     changed_file_linenos: dict[str, set[int]]
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[str], set[str]]:
     """Filter Ruff output to only include diagnostics for lines touched by this branch.
 
     Returns a tuple of (filtered_errors, bad_files).
     """
     filtered_errors = []
-    bad_files = []
+    bad_files = set()
 
     for ruff_line in RUFF_OUT:
         # Ex:
@@ -88,7 +88,7 @@ def filter_ruff_out(
                 )
             ):
                 filtered_errors.append(ruff_line)
-                bad_files.append(path)
+                bad_files.add(path)
 
     return filtered_errors, bad_files
 
