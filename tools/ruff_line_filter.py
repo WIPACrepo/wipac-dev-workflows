@@ -58,9 +58,15 @@ def get_changed_file_linenos(branch_shas: set[str]) -> dict[str, set[int]]:
     return changed_file_linenos
 
 
-def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
-    """Filter Ruff output to only include diagnostics for lines touched by this branch."""
-    keepers = []
+def filter_ruff_out(
+    changed_file_linenos: dict[str, set[int]]
+) -> tuple[list[str], list[str]]:
+    """Filter Ruff output to only include diagnostics for lines touched by this branch.
+
+    Returns a tuple of (filtered_errors, bad_files).
+    """
+    filtered_errors = []
+    bad_files = []
 
     for ruff_line in RUFF_OUT:
         # Ex:
@@ -72,7 +78,8 @@ def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
             lineno = int(m.group("lineno"))
             # is this line touched by this branch?
             if lineno in changed_file_linenos[path]:
-                keepers.append(ruff_line)
+                filtered_errors.append(ruff_line)
+                bad_files.append(path)
             # else, is this line near a line touched by this branch?
             elif CHANGED_LINE_RADIUS > 0 and any(
                 x in changed_file_linenos[path]
@@ -80,9 +87,10 @@ def filter_ruff_out(changed_file_linenos: dict[str, set[int]]) -> list[str]:
                     lineno - CHANGED_LINE_RADIUS, lineno + CHANGED_LINE_RADIUS + 1
                 )
             ):
-                keepers.append(ruff_line)
+                filtered_errors.append(ruff_line)
+                bad_files.append(path)
 
-    return keepers
+    return filtered_errors, bad_files
 
 
 def main():
@@ -105,7 +113,7 @@ def main():
     print("::endgroup::")
 
     # 2: Filter ruff output for only those lines -> print for GitHub Actions
-    keepers = filter_ruff_out(changed_file_linenos)
+    filtered_errors, bad_files = filter_ruff_out(changed_file_linenos)
     print(
         f"Ruff errors on lines touched by this branch"
         + (
@@ -114,13 +122,13 @@ def main():
             else f" (or within {CHANGED_LINE_RADIUS} lines of touched lines):"
         )
     )
-    if keepers:
-        for line in keepers:
+    if filtered_errors:
+        for line in filtered_errors:
             print("::error::" + line)
-        print(f"::error::Found {len(keepers)} errors.")
+        print(f"::error::Found {len(filtered_errors)} errors.")
         print(
             f"::notice::You can run `ruff check --select {os.environ['RUFF_SELECT']}"
-            " (--fix|--fix-only) [PATHS]` to auto-fix *all* issues in file(s)."
+            f" --fix {' '.join(sorted(bad_files))}` to auto-fix *all* issues in file(s)."
         )
         sys.exit(1)
     else:
