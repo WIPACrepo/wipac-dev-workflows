@@ -68,6 +68,22 @@ def filter_ruff_out(
     filtered_errors = []
     bad_files = set()
 
+    def _do_include_line(lineno: int) -> bool:
+        # 1: is this line touched by this branch?
+        if lineno in changed_file_linenos[path]:
+            return True
+        # 2: are we using a radius?
+        elif CHANGED_LINE_RADIUS < 1:
+            return False
+        # 3: is this line within the radius?
+        else:
+            return any(
+                x in changed_file_linenos[path]
+                for x in range(
+                    lineno - CHANGED_LINE_RADIUS, lineno + CHANGED_LINE_RADIUS + 1
+                )
+            )
+
     for ruff_line in RUFF_OUT:
         # Ex:
         # lta/lta_cmd.py:11:8: F401 `copy` imported but unused
@@ -76,17 +92,7 @@ def filter_ruff_out(
             if path not in changed_file_linenos:
                 continue
             lineno = int(m.group("lineno"))
-            # is this line touched by this branch?
-            if lineno in changed_file_linenos[path]:
-                filtered_errors.append(ruff_line)
-                bad_files.append(path)
-            # else, is this line near a line touched by this branch?
-            elif CHANGED_LINE_RADIUS > 0 and any(
-                x in changed_file_linenos[path]
-                for x in range(
-                    lineno - CHANGED_LINE_RADIUS, lineno + CHANGED_LINE_RADIUS + 1
-                )
-            ):
+            if _do_include_line(lineno):
                 filtered_errors.append(ruff_line)
                 bad_files.add(path)
 
