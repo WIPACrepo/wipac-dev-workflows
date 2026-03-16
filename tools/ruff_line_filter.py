@@ -131,10 +131,12 @@ def main():
     if filtered_errors:
         for line in filtered_errors:
             print("::error::" + line)
-        print(f"::error::Found {len(filtered_errors)} errors.")
+        _plural_s = "s" if len(filtered_errors) > 1 else ""  # it's the little things
+        print(f"::error::Found {len(filtered_errors)} error{_plural_s}.")
         print(
             f"::notice::You can run `ruff check --select {os.environ['RUFF_SELECT']}"
-            f" --fix {' '.join(sorted(bad_files))}` to auto-fix *all* issues in file(s)."
+            f" --fix {' '.join(sorted(bad_files))}` to auto-fix *all* issues "
+            f" in {'these files' if _plural_s else 'this file'}."
         )
         sys.exit(1)
     else:
