@@ -737,7 +737,7 @@ jobs:
           echo "is_v_semverish=${is_v_semverish}" >> "$GITHUB_OUTPUT"
 
       # === DOWNLOAD ===
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: platform-digests-${{ inputs.image_name }}-${{ needs.validate-and-plan.outputs.normalized-suffix }}-*
           path: platform-digests
@@ -953,7 +953,7 @@ jobs:
           inputs.mode == 'BUILD' ||
           inputs.mode == 'CVMFS_BUILD' ||
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: platform-digests-${{ inputs.image_name }}-${{ needs.validate-and-plan.outputs.normalized-suffix }}-*
           path: platform-digests
