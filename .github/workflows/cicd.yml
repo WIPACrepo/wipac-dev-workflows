@@ -23,4 +23,4 @@ jobs:
       version-style: 'X.Y'
       more-ignore-paths: |
         !/.github/workflows/*
-        /.github/workflows/cicd.yml
+        .github/workflows/cicd.yml
