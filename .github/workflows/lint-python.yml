@@ -160,7 +160,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-      - name: Install project
+      - name: Install project/dependencies
         run: |
           set -euo pipefail
           #
@@ -170,6 +170,7 @@ jobs:
           #
           # NON-PROJECT -> install all requirements*.txt files
           elif [ -n "$(find . -name 'requirements*.txt' | head -1)" ]; then
+              echo "::warning::Could not find 'pyproject.toml' -- installing all requirements*.txt files instead (if this repo is a collection of scripts, i.e. not a project, ignore this message)"
               pip install $(find . -name 'requirements*.txt' | rev | sed -z 's/\n/ r- /g' | rev)
           #
           # ERROR
