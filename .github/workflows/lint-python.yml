@@ -160,8 +160,25 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-      - name: Install project
-        run: uv sync --extra mypy  # it's okay if this extra does not exist
+      - name: Install project/dependencies
+        run: |
+          set -euo pipefail
+          #
+          # PROJECT -> install from setup.py
+          if [ -e "pyproject.toml" ]; then
+              uv sync --extra mypy  # install special 'extra' (it's okay if this does not exist)
+          #
+          # NON-PROJECT -> install all requirements*.txt files
+          elif [ -n "$(find . -name 'requirements*.txt' | head -1)" ]; then
+              echo "::warning::Could not find 'pyproject.toml' — installing all requirements*.txt files instead. If this repository is a collection of scripts (i.e. not a project), ignore this message."
+              pip install $(find . -name 'requirements*.txt' | rev | sed -z 's/\n/ r- /g' | rev)
+          #
+          # ERROR
+          else
+              echo "::error::Could not install project/dependencies — no 'pyproject.toml' present"
+              echo "::notice::If this repository is a collection of scripts (i.e. not a project), add requirements*.txt file(s)"
+              exit 2
+          fi
       - name: Run ty — on entire repo; use project config (if applicable, else default rules)
         run: |
           set -euo pipefail
