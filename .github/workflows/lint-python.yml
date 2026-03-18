@@ -1,0 +1,290 @@
+name: lint-python.yml
+
+on:
+  workflow_call:
+    inputs:
+      py-matrix-json:
+        description: |
+          The JSON string of the matrix of Python versions to lint against
+          HINT: Use '$ {{ needs.py-versions.outputs.matrix }}' (no space after $)
+        required: true
+        type: string
+      max-complexity:
+        description: |
+          The max allowed McCabe complexity value per function
+          <10:   easier to understand
+          10-15: medium complexity (ideal range)
+          >15:   harder to understand and maintain
+        required: false
+        default: 15
+        type: number
+      max-statements:
+        description: |
+          The max number of statements per function
+        required: false
+        default: 50
+        type: number
+      ruff-modernize-changed-line-radius:
+        description: |
+          ** USED BY 'ruff-modernize' -- ONLY RUNS ON NON-DEFAULT BRANCHES **
+          How many lines on each side of the branch's changed lines to pull in for ruff
+        required: false
+        default: 2
+        type: number
+      ruff-modernize-rules:
+        description: |
+          ** USED BY 'ruff-modernize' -- ONLY RUNS ON NON-DEFAULT BRANCHES **
+          Which Ruff rules to lint for branch's changed lines (stricter than repo-wide job)
+        required: false
+        default: "I,UP,FA"
+        type: string
+
+jobs:
+
+  # FUTURE DEV: remove once ty is out of beta
+  mypy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        py3: ${{ fromJSON(inputs.py-matrix-json) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+          fetch-depth: 0  # setuptools-scm needs to access git tags
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.py3 }}
+      - uses: WIPACrepo/wipac-dev-mypy-action@v3.0
+        with:
+          _no_deprecation: true
+
+  config-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "check if ty is now out of beta"
+        run: |
+          set -euo pipefail
+          if curl -fsSL https://pypi.org/pypi/ty/json | jq -e '
+              (.info.classifiers // [])
+              | index("Development Status :: 4 - Beta")
+              | not
+          ' > /dev/null
+          then
+              echo "::warning::ty is out of beta! no need to run mypy — contact admins"
+          else
+              echo "ty is still beta, proceeding to run mypy and ty jobs"
+          fi
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - name: "ruff-flake8 config check (migrating from flake8 to ruff)"
+        run: |
+          set -euo pipefail
+          
+          # check for either ruff config in project -> if so, all good
+          if [[ -f .ruff.toml || -f ruff.toml ]]; then
+              echo "OK: Found Ruff config: .ruff.toml or ruff.toml"
+              exit 0
+          elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.ruff(\.|])' pyproject.toml; then
+              echo "OK: Found Ruff config: [tool.ruff] in pyproject.toml"
+              exit 0
+          fi
+          
+          # no ruff config -> check for flake8 config -> if so, alert user to migrate
+          msg="::error::Found Flake8 config but no Ruff config. Please migrate Flake8 config to \`[tool.ruff]\`/\`[tool.ruff.lint]\` in pyproject.toml: https://docs.astral.sh/ruff/configuration/"
+          if [[ -f .flake8 ]]; then
+              echo "$msg"
+              echo "::notice::flake8 config found: .flake8"
+              exit 1
+          elif [[ -f setup.cfg ]] && grep -Eq '^[[:space:]]*\[flake8]' setup.cfg; then
+              echo "$msg"
+              echo "::notice::flake8 config found: setup.cfg"
+              exit 1
+          elif [[ -f tox.ini ]] && grep -Eq '^[[:space:]]*\[flake8]' tox.ini; then
+              echo "$msg"
+              echo "::notice::flake8 config found: tox.ini"
+              exit 1
+          else
+              echo "OK: No Ruff or Flake8 config found."
+              exit 0
+          fi
+
+      - name: "ty-mypy config check (migrating from mypy to ty)"
+        run: |
+          set -euo pipefail
+          
+          # check for either ty config in project -> if so, all good
+          if [[ -f ty.toml ]]; then
+              echo "OK: Found ty config: ty.toml"
+              exit 0
+          elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.ty(\.|])' pyproject.toml; then
+              echo "OK: Found ty config: [tool.ty] in pyproject.toml" 
+              exit 0
+          fi 
+          
+          # no ty config -> check for mypy config -> if so, alert user to migrate
+          msg="::error::Found mypy config but no ty config. Please migrate mypy config to \`[tool.ty]\` in pyproject.toml: https://docs.astral.sh/ty/configuration/"
+          if [[ -f mypy.ini || -f .mypy.ini ]]; then
+              echo "$msg"
+              echo "::notice::mypy config found: mypy.ini"
+              exit 1
+          elif [[ -f setup.cfg ]] && grep -Eq '^[[:space:]]*\[mypy]' setup.cfg; then
+              echo "$msg"
+              echo "::notice::mypy config found: setup.cfg"
+              exit 1
+          elif [[ -f pyproject.toml ]] && grep -Eq '^[[:space:]]*\[tool\.mypy]' pyproject.toml; then
+              echo "$msg"
+              echo "::notice::mypy config found: pyproject.toml"
+              exit 1
+          else
+              echo "OK: No ty or mypy config found."
+              exit 0
+          fi  
+
+  ty:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        py3: ${{ fromJSON(inputs.py-matrix-json) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+          fetch-depth: 0  # setuptools-scm needs to access git tags
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.py3 }}
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Install project
+        run: uv sync --extra mypy  # it's okay if this extra does not exist
+      - name: Run ty — on entire repo; use project config (if applicable, else default rules)
+        run: |
+          set -euo pipefail
+          outf="$(mktemp)"
+          
+          # use a var so we can run the command 2x (array for quoting reasons)
+          cmd=(
+              uv run --with ty ty check
+              --python-version ${{ matrix.py3 }}
+          )
+
+          # run -- capture output to file and exit code
+          if "${cmd[@]}" --output-format github > "$outf" 2>&1; then
+              exit_code=0
+          else
+              exit_code=$?
+          fi
+
+          # dump
+          cat "$outf"
+          error_count="$(grep -c '^::error' "$outf" || true)"
+          echo "grep result: $error_count"
+          if [[ "$error_count" -gt 0 ]]; then
+              echo "::error::Found $error_count errors."
+              echo "::group::Full ty output with richer error info, like arrows (click to expand)" 
+              "${cmd[@]}" --output-format full || true 
+              echo "::endgroup::"
+          else
+              echo "::notice::No errors found."
+          fi
+          
+          exit "$exit_code"
+
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: "--version"  # noop, just install ruff
+      - name: Run ruff — on entire repo; use project config (if applicable, else default rules)
+        env:
+          MAX_COMPLEXITY: ${{ inputs.max-complexity }}
+          MAX_STATEMENTS: ${{ inputs.max-statements }}
+        run: |
+          set -euo pipefail
+          outf="$(mktemp)"
+          
+          # note: ruff will use the project's minimum Python version from pyproject.toml
+          
+          # use a var so we can run the command 2x (array for quoting reasons)
+          cmd=(
+              ruff check
+              --extend-select C901,PLR0915
+              --config "lint.mccabe.max-complexity=${MAX_COMPLEXITY}"
+              --config "lint.pylint.max-statements=${MAX_STATEMENTS}"
+              .
+          )
+          
+          # run -- capture output to file and exit code
+          if "${cmd[@]}" --output-format github > "$outf" 2>&1; then
+              exit_code=0
+          else
+              exit_code=$?
+          fi
+          
+          # dump
+          cat "$outf"
+          error_count="$(grep -c '^::error' "$outf" || true)"
+          echo "grep result: $error_count"
+          if [[ "$error_count" -gt 0 ]]; then
+              echo "::error::Found $error_count errors."
+              echo "::group::Full ruff output with richer error info, like arrows (click to expand)" 
+              "${cmd[@]}" --output-format full || true
+              echo "::endgroup::"
+          else
+              echo "::notice::No errors found."
+          fi
+
+          exit "$exit_code"
+
+  ruff-modernize:
+    # Only run on non-default branches
+    if: ${{ github.ref_type == 'branch' && (github.head_ref || github.ref_name) != github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+      - name: Determine reusable workflow ref (somehow not provided by a GHA macro)
+        id: here
+        run: |
+          set -euo pipefail
+          echo $GITHUB_WORKFLOW_REF
+          caller_ref="${GITHUB_WORKFLOW_REF%%@*}"  # drop "@refs/..."
+          echo $caller_ref
+          caller_wf_path=".github/workflows/${caller_ref##*/.github/workflows/}"  # drop root
+          echo $caller_wf_path
+          here_full="$(grep -oE \
+              'WIPACrepo/wipac-dev-workflows/\.github/workflows/lint-python\.yml@[^[:space:]]+' \
+              $caller_wf_path | head -n 1)"
+          echo $here_full
+          here_ref="${here_full##*@}"
+          echo $here_ref
+          echo "here_ref=${here_ref}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          repository: WIPACrepo/wipac-dev-workflows  # aka, here
+          ref: ${{ steps.here.outputs.here_ref }}
+          path: .wipac-dev-workflows
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: "--version"  # noop, just install ruff
+      - name: Run ruff — on branch-touched lines; use project config (if applicable) + stricter rules (${{ inputs.ruff-modernize-rules }})
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RUFF_SELECT: ${{ inputs.ruff-modernize-rules }}
+          CHANGED_LINE_RADIUS: ${{ inputs.ruff-modernize-changed-line-radius }}
+        run: |
+          set -euo pipefail
+          # note: ruff will use the project's minimum Python version from pyproject.toml
+          .wipac-dev-workflows/tools/ruff-this-branch.sh
