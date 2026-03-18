@@ -170,12 +170,12 @@ jobs:
           #
           # NON-PROJECT -> install all requirements*.txt files
           elif [ -n "$(find . -name 'requirements*.txt' | head -1)" ]; then
-              echo "::warning::Could not find 'pyproject.toml' -- installing all requirements*.txt files instead (if this repo is a collection of scripts, i.e. not a project, ignore this message)"
+              echo "::warning::Could not find 'pyproject.toml' — installing all requirements*.txt files instead. If this repository is a collection of scripts (i.e. not a project), ignore this message."
               pip install $(find . -name 'requirements*.txt' | rev | sed -z 's/\n/ r- /g' | rev)
           #
           # ERROR
           else
-              echo "::error::Could not install project/dependencies -- no 'pyproject.toml' present"
+              echo "::error::Could not install project/dependencies — no 'pyproject.toml' present"
               echo "::notice::If this repository is a collection of scripts (i.e. not a project), add requirements*.txt file(s)"
               exit 2
           fi
