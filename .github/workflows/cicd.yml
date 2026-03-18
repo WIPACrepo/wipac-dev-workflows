@@ -22,5 +22,5 @@ jobs:
       project-type: gha-workflow
       version-style: 'X.Y'
       more-ignore-paths: |
-        !/.github/workflows/image-publish.*
-        !/.github/workflows/tag-and-release.*
+        !/.github/workflows/*
+        /.github/workflows/cicd.yml
