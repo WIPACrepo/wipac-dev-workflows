@@ -120,7 +120,7 @@ jobs:
       - name: "Validate image format"
         id: validate
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
 
           fail() { echo "::error::$1"; exit 1; }
 
@@ -190,7 +190,7 @@ jobs:
           REG_TOKEN: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
           CVMFS_GH_TOKEN: ${{ secrets.cvmfs_github_token }}
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           
           fail() { echo "::error::$1"; exit 1; }
           
@@ -412,7 +412,7 @@ jobs:
         id: suffix_norm_for_artifacts
         shell: bash
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           norm="${{ inputs.tag_suffix }}"
           if [[ -z "${norm}" ]]; then norm="nosuffix"; fi
           echo "norm=${norm}" >> "$GITHUB_OUTPUT"
@@ -420,7 +420,7 @@ jobs:
       - name: Prepare build-platform matrix
         id: build-platforms
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
 
           export INPUT_BUILD_PLATFORMS_CSV="${{ inputs.build_platforms_csv }}"
 
@@ -452,7 +452,7 @@ jobs:
       - name: Summary (appears in GitHub UI)
         if: always()
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           {
             echo "# 🧭 Workflow Plan — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
@@ -528,7 +528,7 @@ jobs:
       - name: "Unique parallel artifacts check: Create guard file"
         if: steps.suffix_guard_check.outputs.exists == 'false'
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           printf "reserved by job=%s at %s\n" "${GITHUB_JOB}" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > guard.txt
       - name: "Unique parallel artifacts check: Upload guard artifact"
         if: steps.suffix_guard_check.outputs.exists == 'false'
@@ -565,7 +565,7 @@ jobs:
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
         id: gen
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           
           python -c '
           import os
@@ -628,6 +628,8 @@ jobs:
         with:
           docker-images: false
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: ${{ inputs.image_registry == 'ghcr.io' && 'image=ghcr.io/moby/buildkit:buildx-stable-1' || '' }}
       - id: build
         uses: docker/build-push-action@v6
         with:
@@ -642,7 +644,7 @@ jobs:
       - name: "Store platform-specific image@digest in a file named for the platform"
         id: save_digest
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
 
           mkdir -p "${{ runner.temp }}/to-be-artifacts"
 
@@ -693,7 +695,7 @@ jobs:
         if: github.ref_type == 'tag'
         shell: bash
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           git fetch --all --tags --prune
 
           ########################################################################
@@ -792,10 +794,12 @@ jobs:
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: ${{ inputs.image_registry == 'ghcr.io' && 'image=ghcr.io/moby/buildkit:buildx-stable-1' || '' }}
       - name: Create and push manifest
         id: push_manifest
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
 
           # platform-specific image digests (sha) from those published in 'build-w-platform-and-publish-by-sha' (job)
           shopt -s nullglob
@@ -872,7 +876,7 @@ jobs:
           TAGS: ${{ needs.tag-and-merge-published-images.outputs.tags }}
           TAG_SUFFIX: ${{ inputs.tag_suffix }}
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
 
           pick="$(python -c "
           import re
@@ -962,7 +966,7 @@ jobs:
       - name: Generate Final Summary (appears in GitHub UI)
         if: always()
         run: |
-          set -euo pipefail; echo "now: $(date -u +"%Y-%m-%dT%H:%M:%S.%3N")"
+          set -euo pipefail
           {
             echo "# ✅ Final Workflow Summary — Mode: \`${{ inputs.mode }}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
