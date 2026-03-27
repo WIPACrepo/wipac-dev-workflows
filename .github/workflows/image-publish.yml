@@ -532,7 +532,7 @@ jobs:
           printf "reserved by job=%s at %s\n" "${GITHUB_JOB}" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > guard.txt
       - name: "Unique parallel artifacts check: Upload guard artifact"
         if: steps.suffix_guard_check.outputs.exists == 'false'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
           path: guard.txt
@@ -618,7 +618,7 @@ jobs:
 
       # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
 
@@ -660,7 +660,7 @@ jobs:
           cat "$file"
 
       # === UPLOAD ===
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: platform-digests-${{ inputs.image_name }}-${{ needs.validate-and-plan.outputs.normalized-suffix }}-${{ steps.save_digest.outputs.safe_platform }}
           path: ${{ runner.temp }}/to-be-artifacts/*
@@ -739,7 +739,7 @@ jobs:
           echo "is_v_semverish=${is_v_semverish}" >> "$GITHUB_OUTPUT"
 
       # === DOWNLOAD ===
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: platform-digests-${{ inputs.image_name }}-${{ needs.validate-and-plan.outputs.normalized-suffix }}-*
           path: platform-digests
@@ -755,7 +755,7 @@ jobs:
 
       # GENERATE TAGS
       - id: docker_meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
@@ -957,7 +957,7 @@ jobs:
           inputs.mode == 'BUILD' ||
           inputs.mode == 'CVMFS_BUILD' ||
           inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: platform-digests-${{ inputs.image_name }}-${{ needs.validate-and-plan.outputs.normalized-suffix }}-*
           path: platform-digests
