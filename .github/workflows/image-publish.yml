@@ -608,14 +608,6 @@ jobs:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
           fetch-depth: 0  # git history + tags -> python's setuptools-scm can get correct version
 
-      # LOG INTO CONTAINER REGISTRY
-      - name: Docker login
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ inputs.image_registry }}
-          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
-          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
-
       # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
         uses: docker/metadata-action@v6
@@ -628,8 +620,17 @@ jobs:
         with:
           docker-images: false
       - uses: docker/setup-buildx-action@v3
+      # LOG INTO CONTAINER REGISTRY
+      #   Login is placed after setup-buildx intentionally: docker/login-action
+      #   configures a credential helper that intercepts all Docker Hub pulls, causing
+      #   the buildkit image pull to fail with "unauthorized" when the target registry
+      #   is not Docker Hub. Booting buildx first avoids this.
+      - name: Docker login
+        uses: docker/login-action@v3
         with:
-          driver-opts: ${{ inputs.image_registry == 'ghcr.io' && 'image=ghcr.io/moby/buildkit:buildx-stable-1' || '' }}
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
       - id: build
         uses: docker/build-push-action@v7
         with:
@@ -745,14 +746,6 @@ jobs:
           path: platform-digests
           merge-multiple: true
 
-      # LOG INTO CONTAINER REGISTRY
-      - name: Docker login
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ inputs.image_registry }}
-          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
-          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
-
       # GENERATE TAGS
       - id: docker_meta
         uses: docker/metadata-action@v6
@@ -794,8 +787,14 @@ jobs:
 
       # APPLY TAGS TO IMAGE(S)
       - uses: docker/setup-buildx-action@v3
+      # LOG INTO CONTAINER REGISTRY
+      #   See 'build-w-platform-and-publish-by-sha' job for why we need to log in here
+      - name: Docker login
+        uses: docker/login-action@v3
         with:
-          driver-opts: ${{ inputs.image_registry == 'ghcr.io' && 'image=ghcr.io/moby/buildkit:buildx-stable-1' || '' }}
+          registry: ${{ inputs.image_registry }}
+          username: ${{ inputs.image_registry == 'ghcr.io' && github.actor || secrets.registry_username }}
+          password: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
       - name: Create and push manifest
         id: push_manifest
         run: |
