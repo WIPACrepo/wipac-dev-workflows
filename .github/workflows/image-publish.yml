@@ -629,7 +629,7 @@ jobs:
           docker-images: false
       - uses: docker/setup-buildx-action@v3
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           build-args: ${{ inputs.build_args }}
