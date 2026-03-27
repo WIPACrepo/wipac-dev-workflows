@@ -618,7 +618,7 @@ jobs:
 
       # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
 
@@ -753,7 +753,7 @@ jobs:
 
       # GENERATE TAGS
       - id: docker_meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
