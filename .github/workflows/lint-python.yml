@@ -166,7 +166,7 @@ jobs:
           #
           # PROJECT -> install from setup.py
           if [ -e "pyproject.toml" ]; then
-              uv sync --extra mypy  # install special 'extra' (it's okay if this does not exist)
+              uv sync --extra mypy || uv sync  # install special mypy 'extra' (it's okay if this does not exist)
           #
           # NON-PROJECT -> install all requirements*.txt files
           elif [ -n "$(find . -name 'requirements*.txt' | head -1)" ]; then
