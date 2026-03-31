@@ -154,6 +154,7 @@ jobs:
         with:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
           fetch-depth: 0  # setuptools-scm needs to access git tags
+          fetch-tags: true  # ditto
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.py3 }}
