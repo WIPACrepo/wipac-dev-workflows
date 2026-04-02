@@ -108,6 +108,19 @@ on:
             A PAT so the workflow can git push to GitHub (used for CVMFS build/removal requests)
           SEE: https://github.com/WIPACrepo/build-singularity-cvmfs-action
         required: false
+      dockerfile_secret_name_0:
+        description: |
+          IF BUILDING IMAGE with a secret (else, var is ignored):
+            The secret ID used in the Dockerfile's --mount=type=secret,id=<name>.
+          NOTE: This is included as a secret in the workflow, in case the user 
+            accidentally sets this to an actual secret token.
+        required: false
+      dockerfile_secret_value_0:
+        description: |
+          IF BUILDING IMAGE with a secret (else, var is ignored):
+            The secret value corresponding to 'dockerfile_secret_name_0'.
+        required: false
+
 
 jobs:
   validate-and-plan:
@@ -408,6 +421,30 @@ jobs:
           ########################################################################
           echo "🎯 All conditional input validations passed successfully."
 
+      - name: "Validate dockerfile secret pairs"
+        env:
+          SECRET_NAME_0: ${{ secrets.dockerfile_secret_name_0 }}
+          SECRET_VALUE_0: ${{ secrets.dockerfile_secret_value_0 }}
+          # SECRET_NAME_1: ${{ secrets.dockerfile_secret_name_1 }}
+          # SECRET_VALUE_1: ${{ secrets.dockerfile_secret_value_1 }}
+        run: |
+          set -euo pipefail
+          LAST_PAIR=0  # <- Update this if you add more secrets!
+          for i in $(seq 0 $LAST_PAIR); do
+            name_var="SECRET_NAME_${i}"
+            value_var="SECRET_VALUE_${i}"
+            name="${!name_var}"
+            value="${!value_var}"
+            if [[ -n "${name}" && -z "${value}" ]]; then
+              echo "::error::dockerfile_secret_name_${i} is set but dockerfile_secret_value_${i} is missing."
+              exit 1
+            fi
+            if [[ -z "${name}" && -n "${value}" ]]; then
+              echo "::error::dockerfile_secret_value_${i} is set but dockerfile_secret_name_${i} is missing."
+              exit 1
+            fi
+          done
+
       - name: "Normalize suffix for use in artifacts"
         id: suffix_norm_for_artifacts
         shell: bash
@@ -640,6 +677,7 @@ jobs:
           tags: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
           labels: ${{ steps.docker_meta.outputs.labels }}
           outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          secrets: ${{ secrets.dockerfile_secret_name_0 != '' && format('{0}={1}', secrets.dockerfile_secret_name_0, secrets.dockerfile_secret_value_0) || '' }}
 
       # USE ARTIFACTS
       - name: "Store platform-specific image@digest in a file named for the platform"
