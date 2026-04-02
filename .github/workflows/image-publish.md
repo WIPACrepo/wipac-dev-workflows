@@ -62,11 +62,20 @@ Depending on the `mode`, secret(s) may be required:
 
 #### If interacting with CVMFS
 
-| Name                 | Required          | Description                                                                                                                                  |
-|----------------------|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `cvmfs_github_token` | ✅, if using CVMFS | GitHub PAT used to interact with  [`WIPACrepo/build-singularity-cvmfs-action`](https://github.com/WIPACrepo/build-singularity-cvmfs-action/) |
+| Name                 | Required          | Description                                                                                                                                 |
+|----------------------|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| `cvmfs_github_token` | ✅, if using CVMFS | GitHub PAT used to interact with [`WIPACrepo/build-singularity-cvmfs-action`](https://github.com/WIPACrepo/build-singularity-cvmfs-action/) |
 
-## Tag Suffix and “latest” Behavior
+#### If building with Dockerfile secrets (`--mount=type=secret`)
+
+| Name                        | Required                                       | Description                                                                                             |
+|-----------------------------|------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| `dockerfile_secret_name_0`  | ⚠️, only if `dockerfile_secret_value_0` is set | The secret ID matching the Dockerfile's `--mount=type=secret,id=<name>` for secret 0.                   |
+| `dockerfile_secret_value_0` | ⚠️, only if `dockerfile_secret_name_0` is set  | The secret value for `dockerfile_secret_name_0`. Passed securely to BuildKit via `--mount=type=secret`. |
+
+> NOTE: Both are declared as `secrets:` (not `inputs:`) so their values are never exposed in the GitHub UI or workflow run logs. Additional pairs (`_1`, `_2`, ...) can be added in future versions.
+
+## Tag Suffix and "latest" Behavior
 
 When `tag_suffix` is provided (e.g., `tag_suffix: appt`):
 
