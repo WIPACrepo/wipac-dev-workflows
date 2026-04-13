@@ -544,7 +544,7 @@ jobs:
       # ── Early guard: prevent multiple workflow_call invocations from using the same tag_suffix
       - name: "Unique parallel artifacts check: GitHub API"
         id: suffix_guard_check
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           GUARD_NAME: suffix-guard-${{ inputs.image_name }}-${{ steps.suffix_norm_for_artifacts.outputs.norm }}
         with:
