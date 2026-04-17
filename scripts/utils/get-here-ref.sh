@@ -3,7 +3,7 @@ set -euo pipefail
 set -x
 
 ################################################################################
-# Usage: determine-reusable-ref.sh <owner>/<repo>/.github/workflows/<file>.yml
+# Usage: get-here-ref.sh.sh <owner>/<repo>/.github/workflows/<file>.yml
 ################################################################################
 
 # check args

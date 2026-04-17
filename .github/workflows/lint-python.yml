@@ -272,24 +272,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
-      - name: Determine reusable workflow ref (somehow not provided by a GHA macro)
+      - name: Determine reusable workflow ref (somehow this is not provided by a GHA macro)
         id: here
         run: |
           set -euo pipefail
-          set -x
-          # 1 -> WIPACrepo/some-repo/.github/workflows/ci.yml@refs/heads/main
-          echo "$GITHUB_WORKFLOW_REF"
-          # 2 -> WIPACrepo/some-repo/.github/workflows/ci.yml
-          caller_ref="${GITHUB_WORKFLOW_REF%%@*}"  # drop everything after "@"
-          # 3 -> .github/workflows/ci.yml
-          caller_wf_path=".github/workflows/${caller_ref##*/.github/workflows/}"  # drop root
-          # 4 -> WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@v4.2
-          here_full="$(grep -oE \
-              'WIPACrepo/wipac-dev-workflows/\.github/workflows/lint-python\.yml@[^[:space:]]+' \
-              "$caller_wf_path" | head -n 1)"
-          # 5 -> v4.2
-          here_ref="${here_full##*@}"  # grab what's after "@"
-          echo "here_ref=${here_ref}" >> "$GITHUB_OUTPUT"
+          curl -fsSL https://raw.githubusercontent.com/WIPACrepo/wipac-dev-workflows/main/scripts/get-here-ref.sh.sh \
+              | bash -s -- "WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml"
       - uses: actions/checkout@v6
         with:
           repository: WIPACrepo/wipac-dev-workflows  # aka, here
