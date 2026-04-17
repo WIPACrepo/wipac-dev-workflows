@@ -50,7 +50,7 @@ fi
 target_re="${target//./\\.}"
 
 # 4 -> WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@v4.2
-here_full="$(grep -oE "${target_re}@[^[:space:]]+" "$caller_wf_path" | head -n 1)"
+here_full="$(grep -oE "${target_re}@[^[:space:]]+" "$caller_wf_path" | head -n 1 || true)"
 if [[ -z $here_full ]]; then
     echo "::error file=${caller_wf_path}::could not find '${target}@<ref>' in caller workflow"
     exit 1
