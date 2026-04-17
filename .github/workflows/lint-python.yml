@@ -276,17 +276,19 @@ jobs:
         id: here
         run: |
           set -euo pipefail
-          echo $GITHUB_WORKFLOW_REF
-          caller_ref="${GITHUB_WORKFLOW_REF%%@*}"  # drop "@refs/..."
-          echo $caller_ref
+          set -x
+          # 1 -> WIPACrepo/some-repo/.github/workflows/ci.yml@refs/heads/main
+          echo "$GITHUB_WORKFLOW_REF"
+          # 2 -> WIPACrepo/some-repo/.github/workflows/ci.yml
+          caller_ref="${GITHUB_WORKFLOW_REF%%@*}"  # drop everything after "@"
+          # 3 -> .github/workflows/ci.yml
           caller_wf_path=".github/workflows/${caller_ref##*/.github/workflows/}"  # drop root
-          echo $caller_wf_path
+          # 4 -> WIPACrepo/wipac-dev-workflows/.github/workflows/lint-python.yml@v4.2
           here_full="$(grep -oE \
               'WIPACrepo/wipac-dev-workflows/\.github/workflows/lint-python\.yml@[^[:space:]]+' \
-              $caller_wf_path | head -n 1)"
-          echo $here_full
-          here_ref="${here_full##*@}"
-          echo $here_ref
+              "$caller_wf_path" | head -n 1)"
+          # 5 -> v4.2
+          here_ref="${here_full##*@}"  # grab what's after "@"
           echo "here_ref=${here_ref}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v6
         with:
