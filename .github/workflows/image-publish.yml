@@ -488,58 +488,73 @@ jobs:
 
       - name: Summary (appears in GitHub UI)
         if: always()
+        env:
+          MODE: ${{ inputs.mode }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          REF_TYPE: ${{ github.ref_type }}
+          IMAGE_REGISTRY: ${{ inputs.image_registry }}
+          IMAGE_NAMESPACE: ${{ inputs.image_namespace }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          # passed via env to avoid shell-expansion of '$' chars in secret values (e.g., Harbor robot accounts: robot$foo)
+          REGISTRY_USERNAME: ${{ secrets.registry_username || 'null' }}
+          CVMFS_DEST_DIR: ${{ inputs.cvmfs_dest_dir || 'null' }}
+          CVMFS_REMOVE_TAGS: ${{ inputs.cvmfs_remove_tags }}
+          EXTRA_BUILD_TAG: ${{ inputs.extra_build_tag || 'null' }}
+          TAG_SUFFIX: ${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'null' }}
+          PLATFORM_MATRIX: ${{ steps.build-platforms.outputs.matrix }}
         run: |
           set -euo pipefail
           {
-            echo "# 🧭 Workflow Plan — Mode: \`${{ inputs.mode }}\`"
+            echo "# 🧭 Workflow Plan — Mode: \`${MODE}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
           
             echo "### 🧩 GitHub Context"
-            echo "- ref: \`${{ github.ref }}\`"
-            echo "- sha: \`${{ github.sha }}\`"
-            echo "- ref_type: \`${{ github.ref_type }}\`"
+            echo "- ref: \`${REF}\`"
+            echo "- sha: \`${SHA}\`"
+            echo "- ref_type: \`${REF_TYPE}\`"
           
             echo "### 🔧 Inputs"
-            echo "- \`image\` = ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}"
-            echo "- \`mode\` = ${{ inputs.mode }}"
-            echo "- \`registry_username\` = ${{ secrets.registry_username || 'null' }}"
-            echo "- \`cvmfs_dest_dir\` = ${{ inputs.cvmfs_dest_dir || 'null' }}"
+            echo "- \`image\` = ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/${IMAGE_NAME}"
+            echo "- \`mode\` = ${MODE}"
+            echo "- \`registry_username\` = ${REGISTRY_USERNAME}"
+            echo "- \`cvmfs_dest_dir\` = ${CVMFS_DEST_DIR}"
             echo "- \`cvmfs_remove_tags\` ="
             echo '```'
-            echo "${{ inputs.cvmfs_remove_tags }}"
+            echo "${CVMFS_REMOVE_TAGS}"
             echo '```'
-            echo "- \`extra_build_tag\` = ${{ inputs.extra_build_tag || 'null' }}"
-            echo "- \`tag_suffix\` = ${{ inputs.tag_suffix != '' && inputs.tag_suffix || 'null' }}"
+            echo "- \`extra_build_tag\` = ${EXTRA_BUILD_TAG}"
+            echo "- \`tag_suffix\` = ${TAG_SUFFIX}"
             echo ""
           
-            if [[ "${{ inputs.mode }}" == "BUILD" || \
-                  "${{ inputs.mode }}" == "CVMFS_BUILD" || \
-                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+            if [[ "${MODE}" == "BUILD" || \
+                  "${MODE}" == "CVMFS_BUILD" || \
+                  "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               echo "### 📋 Build Config"
-              echo "- \`platform matrix\` = ${{ steps.build-platforms.outputs.matrix }}"
+              echo "- \`platform matrix\` = ${PLATFORM_MATRIX}"
               echo ""
             fi
 
             echo "### ⏭️ Planned Actions"
-            if [[ "${{ inputs.mode }}" == "CVMFS_REMOVE" || \
-                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+            if [[ "${MODE}" == "CVMFS_REMOVE" || \
+                  "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               echo "- Will request CVMFS image removal"
             fi
-            if [[ "${{ inputs.mode }}" == "BUILD" || \
-                  "${{ inputs.mode }}" == "CVMFS_BUILD" || \
-                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+            if [[ "${MODE}" == "BUILD" || \
+                  "${MODE}" == "CVMFS_BUILD" || \
+                  "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               echo "- Will build & publish Docker image(s)"
             fi
-            if [[ "${{ inputs.mode }}" == "CVMFS_BUILD" || \
-                  "${{ inputs.mode }}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
+            if [[ "${MODE}" == "CVMFS_BUILD" || \
+                  "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               echo "- Will request CVMFS Singularity build"
             fi
 
             echo ""
 
             echo "_Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")_"
-          } >> "$GITHUB_STEP_SUMMARY"     
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # ── Early guard: prevent multiple workflow_call invocations from using the same tag_suffix
       - name: "Unique parallel artifacts check: GitHub API"
