@@ -235,10 +235,58 @@ jobs:
       - if: |
           steps.next-version.outputs.version != '' &&
           inputs.project-type == 'python'
-        name: Build Python package
-        uses: WIPACrepo/wipac-dev-py-build-action@v1.1
-        # -> uses the most recent git tag for versioning (aka the one made above)
-        # -> creates 'dist/' files
+        name: Build Python Package (using setuptools-scm)
+        run: |
+          set -euo pipefail
+          
+          # Figure Project's Min Py Version
+          python -m venv action_venv
+          . action_venv/bin/activate
+          pip3 install wipac-dev-tools[semver]
+          MIN_PY=$(python -c "
+          from wipac_dev_tools import semver_parser_tools
+          top_python = semver_parser_tools.get_latest_py3_release()
+          all_matches = semver_parser_tools.list_all_majmin_versions(
+          major=top_python[0],
+          semver_range=semver_parser_tools.get_py_semver_range_for_project(),
+          max_minor=top_python[1],
+          )
+          first = all_matches[0]
+          print(f'{first[0]}.{first[1]}')
+          ")
+          
+          # Verify current Python version matches requires-python
+          actual="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+          echo "Expected Python: $MIN_PY"
+          echo "Actual Python:   $actual"
+          if [[ "$actual" != "$MIN_PY" ]]; then
+            echo "::error::Current Python ($actual) does not match minimum requires-python ($MIN_PY)"
+            exit 1
+          fi
+
+          # Validate project's setuptools-scm usage
+          if ! grep -q 'setuptools-scm' pyproject.toml; then
+              echo "::error::setuptools-scm not found in pyproject.toml — aborting"
+              exit 1
+          fi
+          if grep -A 5 '^\[project\]' pyproject.toml | grep -q '^version\s*='; then
+              echo "::error::[project] version is explicitly set — must be managed by setuptools-scm"
+              exit 1
+          fi
+          if ! grep -Eq '^\[tool\.setuptools_scm\]' pyproject.toml; then
+              echo "::error::[tool.setuptools_scm] not found in pyproject.toml — aborting"
+              exit 1
+          fi
+
+          # Install build tools
+          python -m pip install --upgrade pip
+          pip install build setuptools setuptools-scm
+
+          # Build!
+          # -> setuptools-scm -- uses the most recent git tag for package version (aka the one made in prev step)
+          # -> 'python -m build' -- creates 'dist/' files
+          SETUPTOOLS_SCM_DEBUG=1 \
+              python -m build
 
       - if: |
           steps.next-version.outputs.version != '' && 
