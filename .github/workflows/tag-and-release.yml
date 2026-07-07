@@ -310,7 +310,7 @@ jobs:
 
       - if: steps.next-version.outputs.version != ''
         name: GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.next-version.outputs.version }}  # must match git tag above
           generate_release_notes: true
