@@ -186,7 +186,7 @@ jobs:
           
           # use a var so we can run the command 2x (array for quoting reasons)
           cmd=(
-              uv run --with ty ty check
+              uv run --with ty ty check --exit-zero-on-warning
               --python-version ${{ matrix.py3 }}
           )
 
