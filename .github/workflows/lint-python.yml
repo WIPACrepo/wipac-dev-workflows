@@ -41,41 +41,22 @@ on:
 
 jobs:
 
-  # FUTURE DEV: remove once ty is out of beta
-  mypy:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        py3: ${{ fromJSON(inputs.py-matrix-json) }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
-          fetch-depth: 0  # setuptools-scm needs to access git tags
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ matrix.py3 }}
-      - uses: WIPACrepo/wipac-dev-mypy-action@v3.1
-        with:
-          _no_deprecation: true
-
   config-checks:
     runs-on: ubuntu-latest
     steps:
-      - name: "check if ty is now out of beta"
+      # FUTURE DEV: you can remove this step after ty is out of beta -----vvvv
+      - name: "check if ty is still in beta"
         run: |
           set -euo pipefail
           if curl -fsSL https://pypi.org/pypi/ty/json | jq -e '
               (.info.classifiers // [])
               | index("Development Status :: 4 - Beta")
-              | not
           ' > /dev/null
           then
-              echo "::warning::ty is out of beta! no need to run mypy — contact admins"
-          else
-              echo "ty is still beta, proceeding to run mypy and ty jobs"
+              echo "::warning::ty is still in beta"
           fi
+      # FUTURE DEV: you can remove this step after ty is out of beta -----^^^^
+
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
