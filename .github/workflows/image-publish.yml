@@ -87,6 +87,15 @@ on:
         required: false
         type: string
         default: ""
+      context:
+        description: |
+          IF BUILDING IMAGE (else, var is ignored):
+            If provided, sets the build context to the specified subdirectory in the repository. This can allow you to either 
+            build multiple images, or have the Dockerfile be in a different directory than the root
+          EXAMPLE: ubuntu20.04/docker-stack-base-cpu/
+        required: false
+        type: string
+        default: "."
 
     secrets:
       registry_username:
@@ -120,7 +129,6 @@ on:
           IF BUILDING IMAGE with a secret (else, var is ignored):
             The secret value corresponding to 'dockerfile_secret_name_0'.
         required: false
-
 
 jobs:
   validate-and-plan:
@@ -199,14 +207,15 @@ jobs:
           CVMFS_REMOVE_TAGS: ${{ inputs.cvmfs_remove_tags }}
           EXTRA_BUILD_TAG: ${{ inputs.extra_build_tag }}
           BUILD_PLATFORMS_CSV: ${{ inputs.build_platforms_csv }}
+          CONTEXT: ${{ inputs.context }}
           REG_USER: ${{ inputs.image_registry == 'ghcr.io' && '' || secrets.registry_username }}
           REG_TOKEN: ${{ inputs.image_registry == 'ghcr.io' && secrets.GITHUB_TOKEN || secrets.registry_token }}
           CVMFS_GH_TOKEN: ${{ secrets.cvmfs_github_token }}
         run: |
           set -euo pipefail
-          
+
           fail() { echo "::error::$1"; exit 1; }
-          
+
           echo "──────────────────────────────────────────────"
           echo "🔠 INPUTS"
           echo "──────────────────────────────────────────────"
@@ -217,11 +226,12 @@ jobs:
           echo "cvmfs_remove_tags: $CVMFS_REMOVE_TAGS"
           echo "extra_build_tag: $EXTRA_BUILD_TAG"
           echo "build_platforms_csv: $BUILD_PLATFORMS_CSV"
-          
+          echo "context: $CONTEXT"
+
           echo "──────────────────────────────────────────────"
           echo "🧩 VALIDATING CONDITIONAL INPUTS"
           echo "──────────────────────────────────────────────"
-          
+
           ########################################################################
           # MODE
           ########################################################################
@@ -238,7 +248,7 @@ jobs:
               fail "Invalid 'mode'='${MODE}'. Must be one of: BUILD, CVMFS_BUILD, CVMFS_REMOVE, CVMFS_REMOVE_THEN_BUILD."
           fi
           echo "✅ Mode '${MODE}' OK."
-          
+
           ########################################################################
           # TAG_SUFFIX
           ########################################################################
@@ -251,7 +261,7 @@ jobs:
           else
               echo "✅ tag_suffix not provided (optional)."
           fi
-          
+
           ########################################################################
           # EXTRA_BUILD_TAG
           ########################################################################
@@ -273,7 +283,7 @@ jobs:
           else
               echo "✅ extra_build_tag not provided (optional)."
           fi
-          
+
           ########################################################################
           # BUILD-MODE FLAG
           ########################################################################
@@ -285,7 +295,7 @@ jobs:
           elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               _is_build_mode=true
           fi
-          
+
           ########################################################################
           # REGISTRY AUTH (only when building)
           ########################################################################
@@ -314,7 +324,7 @@ jobs:
           else
               echo "✅ Registry auth not required for mode '${MODE}'."
           fi
-          
+
           ########################################################################
           # BUILD PLATFORMS (only when building)
           ########################################################################
@@ -340,7 +350,7 @@ jobs:
           else
               echo "✅ build_platforms_csv not required for mode '${MODE}'."
           fi
-          
+
           ########################################################################
           # CVMFS-MODE FLAG
           ########################################################################
@@ -352,7 +362,7 @@ jobs:
           elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               _touches_cvmfs=true
           fi
-          
+
           ########################################################################
           # CVMFS PREREQUISITES (any mode that touches CVMFS)
           ########################################################################
@@ -371,7 +381,7 @@ jobs:
           else
               echo "✅ CVMFS prerequisites not required for mode '${MODE}'."
           fi
-          
+
           ########################################################################
           # REMOVAL-MODE FLAG
           ########################################################################
@@ -381,7 +391,7 @@ jobs:
           elif [[ "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
               _is_remove_mode=true
           fi
-          
+
           ########################################################################
           # CVMFS REMOVAL TAGS (only in removal modes) — Python inline
           ########################################################################
@@ -389,10 +399,10 @@ jobs:
               echo "→ Checking cvmfs_remove_tags content..."
               python -c '
           import os, re, sys
-          
+
           raw = os.environ.get("CVMFS_REMOVE_TAGS", "")
           print("debug: raw CVMFS_REMOVE_TAGS follows:"); print(raw)
-          
+
           tags=[]
           for i,line in enumerate(raw.splitlines(), 1):
               s=line.strip()
@@ -403,7 +413,7 @@ jobs:
               if re.search(r"\s",s):
                   print(f"::error::cvmfs_remove_tags: line {i} has whitespace {line!r}"); sys.exit(1)
               tags.append(s)
-          
+
           if not tags:
               print("::error::cvmfs_remove_tags: no valid tags (one tag per line, comments allowed)"); sys.exit(1)
           else:
@@ -413,9 +423,19 @@ jobs:
           else
               echo "✅ cvmfs_remove_tags not required for mode '${MODE}'."
           fi
-          
-          
-          
+
+          ########################################################################
+          # CONTEXT (only building)
+          ########################################################################
+          if [[ "${_is_build_mode}" == "true" ]]; then
+            if [[ ! pathchk "${CONTEXT:-}" ]]; then
+                fail "Context direcotry ${CONTEXT} does not appear to be a valid path"
+            fi
+            echo "✅ Build context directory is valid"
+          else
+              echo "✅ Build context not required for mode '${MODE}'."
+          fi
+
           ########################################################################
           # DONE!
           ########################################################################
@@ -435,7 +455,7 @@ jobs:
             value_var="SECRET_VALUE_${i}"
             name="${!name_var}"
             value="${!value_var}"
-            if [[ -n "${name}" && -z "${value}" ]]; then
+            if [[ -n "${name}" && -z "${value}" ]]; 
               echo "::error::dockerfile_secret_name_${i} is set but dockerfile_secret_value_${i} is missing."
               exit 1
             fi
@@ -509,12 +529,12 @@ jobs:
             echo "# 🧭 Workflow Plan — Mode: \`${MODE}\`"
             echo "_By WIPACrepo/wipac-dev-workflows/image-publish/workflow.yml_"
             echo ""
-          
+
             echo "### 🧩 GitHub Context"
             echo "- ref: \`${REF}\`"
             echo "- sha: \`${SHA}\`"
             echo "- ref_type: \`${REF_TYPE}\`"
-          
+
             echo "### 🔧 Inputs"
             echo "- \`image\` = ${IMAGE_REGISTRY}/${IMAGE_NAMESPACE}/${IMAGE_NAME}"
             echo "- \`mode\` = ${MODE}"
@@ -527,7 +547,7 @@ jobs:
             echo "- \`extra_build_tag\` = ${EXTRA_BUILD_TAG}"
             echo "- \`tag_suffix\` = ${TAG_SUFFIX}"
             echo ""
-          
+
             if [[ "${MODE}" == "BUILD" || \
                   "${MODE}" == "CVMFS_BUILD" || \
                   "${MODE}" == "CVMFS_REMOVE_THEN_BUILD" ]]; then
@@ -591,9 +611,26 @@ jobs:
           retention-days: 1
           overwrite: false
 
+      # Ensure context is valid (Dockerfile exists in path)
+      - if: inputs.mode == 'BUILD'
+        uses: actions/checkout@v7
+        env:
+          CONTEXT: ${{ inputs.context }}
+        run: |
+          set -euo pipefail
+
+          fail() { echo "::error::$1"; exit 1; }
+
+          if [[ ! -d "${CONTEXT:-}" ]]; then
+            fail "Context ${CONTEXT} does not exist"
+          fi
+          if [[ ! -f "${CONTEXT:-}/Dockerfile" ]]; then
+            fail "Dockerfile in ${CONTEXT} does not exist"
+          fi
+          echo "✅ Build context ${CONTEXT} ok"
 
   maybe-remove-from-cvmfs:
-    needs: [ validate-and-plan ]
+    needs: [validate-and-plan]
     runs-on: ubuntu-latest
     if: >
       inputs.mode == 'CVMFS_REMOVE' ||
@@ -618,7 +655,7 @@ jobs:
         id: gen
         run: |
           set -euo pipefail
-          
+
           python -c '
           import os
           tags = """${{ inputs.cvmfs_remove_tags }}"""
@@ -628,7 +665,7 @@ jobs:
                   if t.strip():
                       f.write(f"{image}:{t.strip()}\n")
           '
-          
+
           echo "delete_image_nametags<<EOF" >> "$GITHUB_OUTPUT"
           cat delete_image_nametags.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -643,13 +680,12 @@ jobs:
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
           delete_image_nametags: ${{ steps.gen.outputs.delete_image_nametags }}
 
-
   build-w-platform-and-publish-by-sha:
     if: >
       inputs.mode == 'BUILD' ||
       inputs.mode == 'CVMFS_BUILD' ||
       inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
-    needs: [ validate-and-plan ]
+    needs: [validate-and-plan]
     strategy:
       matrix:
         include: ${{ fromJson(needs.validate-and-plan.outputs.build-platform-matrix) }}
@@ -657,8 +693,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
-          fetch-depth: 0  # git history + tags -> python's setuptools-scm can get correct version
+          ref: ${{ github.sha }} # lock to triggered commit (github.ref is dynamic)
+          fetch-depth: 0 # git history + tags -> python's setuptools-scm can get correct version
+          path: inputs.context
 
       # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
@@ -710,7 +747,7 @@ jobs:
           file="${{ runner.temp }}/to-be-artifacts/${safe_platform}.txt"
           echo "${image_at_digest}" > "$file"
           echo "safe_platform=$safe_platform" >> "$GITHUB_OUTPUT"
-          
+
           cat "$file"
 
       # === UPLOAD ===
@@ -721,7 +758,6 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-
   tag-and-merge-published-images:
     # now, tag the image(s) just published -- if multiple images, this merges under a single manifest
     if: >
@@ -729,9 +765,9 @@ jobs:
       inputs.mode == 'CVMFS_BUILD' ||
       inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [
-      validate-and-plan,
-      build-w-platform-and-publish-by-sha, # needed b/c image(s) need to be published before tagging/merging
-    ]
+        validate-and-plan,
+        build-w-platform-and-publish-by-sha, # needed b/c image(s) need to be published before tagging/merging
+      ]
     runs-on: ubuntu-latest
     outputs:
       tags: ${{ steps.docker_meta.outputs.tags }}
@@ -742,8 +778,8 @@ jobs:
         if: github.ref_type == 'tag'
         uses: actions/checkout@v7
         with:
-          fetch-depth: 0  # we need git tags
-          ref: ${{ github.sha }}  # lock to triggered commit (github.ref is dynamic)
+          fetch-depth: 0 # we need git tags
+          ref: ${{ github.sha }} # lock to triggered commit (github.ref is dynamic)
       - name: "Tag-Pushes Only: Resolve branch name, short SHA, and tag kind"
         id: branch_for_tag
         if: github.ref_type == 'tag'
@@ -809,7 +845,7 @@ jobs:
             # CUSTOM TAG: using 'extra_build_tag'\
             #   example: dev
             type=raw,value=${{ inputs.extra_build_tag }},enable=${{ inputs.extra_build_tag != '' }}
-            
+
             # RUNNING ON: branch
             # -> verbatim branch name
             #   example: main
@@ -820,7 +856,7 @@ jobs:
             #   example: main-1a2b3c4
             #   example: foo-4d5e6f7
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
-            
+
             # RUNNING ON: new tag
             # -> semver-derived tags
             #   example: v1 + v1.2 + v1.2.3
@@ -910,16 +946,15 @@ jobs:
               echo "summary_manifest_ref=$fallback" >> "$GITHUB_OUTPUT"
           fi
 
-
   build-on-cvmfs:
     if: >
       inputs.mode == 'CVMFS_BUILD' ||
       inputs.mode == 'CVMFS_REMOVE_THEN_BUILD'
     needs: [
-      validate-and-plan,
-      maybe-remove-from-cvmfs,  # needed b/c cvmfs removals need to happen before builds
-      tag-and-merge-published-images,  # needed for retrieving images
-    ]
+        validate-and-plan,
+        maybe-remove-from-cvmfs, # needed b/c cvmfs removals need to happen before builds
+        tag-and-merge-published-images, # needed for retrieving images
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: Select single best image tag for CVMFS build
@@ -938,10 +973,10 @@ jobs:
           # Read newline-delimited refs from env (robust against quoting)
           tags = [t.strip() for t in os.environ['TAGS'].splitlines() if t.strip()]
           suffix = os.environ.get('TAG_SUFFIX', '').lstrip('-')
-          
+
           def tag_part(ref: str) -> str:
               return ref.rsplit(':', 1)[-1]
-          
+
           # Exclude 'latest' and 'latest-<suffix>'
           filtered = []
           for r in tags:
@@ -949,7 +984,7 @@ jobs:
             if t == 'latest' or (suffix and t == f'latest-{suffix}'):
               continue
             filtered.append(r)
-          
+
           def first_match(rx_list: list[str]):
             for rx in rx_list:
               pat = re.compile(rx)
@@ -957,7 +992,7 @@ jobs:
                 if pat.fullmatch(tag_part(ref)):
                   return ref
             return None
-          
+
           # Base regexes (no suffix)
           regexes = [
             r'^[vV]?\d+\.\d+\.\d+$',   # v1.2.3
@@ -970,7 +1005,7 @@ jobs:
             _suf = re.escape(suffix)
             for base in list(regexes):
               regexes.append(base.rstrip('$') + f'-{_suf}$')
-          
+
           # Choose best tag
           pick = first_match(regexes)
           if not pick:
@@ -981,7 +1016,7 @@ jobs:
           else:
             print(pick)
           ")"
-          
+
           echo "Selected for CVMFS: ${pick}"
           echo "tag=${pick}" >> "$GITHUB_OUTPUT"
 
@@ -991,17 +1026,16 @@ jobs:
           dest_dir: ${{ inputs.cvmfs_dest_dir }}
           build_images: ${{ steps.select.outputs.tag }}
 
-
   final-summary:
     if: always()
     needs: [
-      # after all jobs:
-      validate-and-plan,
-      maybe-remove-from-cvmfs,
-      build-w-platform-and-publish-by-sha,
-      tag-and-merge-published-images,
-      build-on-cvmfs,
-    ]
+        # after all jobs:
+        validate-and-plan,
+        maybe-remove-from-cvmfs,
+        build-w-platform-and-publish-by-sha,
+        tag-and-merge-published-images,
+        build-on-cvmfs,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: Download platform digests
