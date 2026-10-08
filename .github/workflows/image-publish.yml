@@ -613,13 +613,15 @@ jobs:
 
       # Ensure context is valid (Dockerfile exists in path)
       - if: inputs.mode == 'BUILD'
-        uses: actions/checkout@v7
+        uses: actions/checkout@v6
+      - name: "Validate context Dockerfile"
+        if: inputs.mode == 'BUILD'
         env:
           CONTEXT: ${{ inputs.context }}
         run: |
           set -euo pipefail
 
-          fail() { echo "::error::$1"; exit 1; }
+          fail() { echo "::error::$0"; exit 1; }
 
           if [[ ! -d "${CONTEXT:-}" ]]; then
             fail "Context ${CONTEXT} does not exist"
