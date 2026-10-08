@@ -428,7 +428,7 @@ jobs:
           # CONTEXT (only building)
           ########################################################################
           if [[ "${_is_build_mode}" == "true" ]]; then
-            if [[ ! pathchk "${CONTEXT:-}" ]]; then
+            if ! pathchk -- "${CONTEXT:-}" ]] 2>/dev/null; then
                 fail "Context direcotry ${CONTEXT} does not appear to be a valid path"
             fi
             echo "✅ Build context directory is valid"
