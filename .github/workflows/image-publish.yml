@@ -455,7 +455,7 @@ jobs:
             value_var="SECRET_VALUE_${i}"
             name="${!name_var}"
             value="${!value_var}"
-            if [[ -n "${name}" && -z "${value}" ]]; 
+            if [[ -n "${name}" && -z "${value}" ]]; then
               echo "::error::dockerfile_secret_name_${i} is set but dockerfile_secret_value_${i} is missing."
               exit 1
             fi
