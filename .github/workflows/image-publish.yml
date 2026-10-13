@@ -697,7 +697,14 @@ jobs:
         with:
           ref: ${{ github.sha }} # lock to triggered commit (github.ref is dynamic)
           fetch-depth: 0 # git history + tags -> python's setuptools-scm can get correct version
-          path: ${{ inputs.context }}
+
+      - name: Change context directory
+        if: inputs.context != '.'
+        env:
+          CONTEXT: ${{ inputs.context }}
+        run: |
+          set -eu pipefail
+          cd $CONTEXT
 
       # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
