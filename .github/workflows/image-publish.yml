@@ -698,14 +698,6 @@ jobs:
           ref: ${{ github.sha }} # lock to triggered commit (github.ref is dynamic)
           fetch-depth: 0 # git history + tags -> python's setuptools-scm can get correct version
 
-      - name: Change context directory
-        if: inputs.context != '.'
-        env:
-          CONTEXT: ${{ inputs.context }}
-        run: |
-          set -eu pipefail
-          cd $CONTEXT
-
       # VERY BASIC METADATA - tagging occurs in 'tag-and-merge-published-images' (job)
       - id: docker_meta
         uses: docker/metadata-action@v6
@@ -732,7 +724,7 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: ${{ inputs.context }}
           build-args: ${{ inputs.build_args }}
           platforms: ${{ matrix.platform }}
           tags: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
