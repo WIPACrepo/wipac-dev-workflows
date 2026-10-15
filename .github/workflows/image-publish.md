@@ -48,6 +48,7 @@ This GitHub Actions **reusable workflow** builds and pushes Docker images to Doc
 | `build_platforms_csv` | no       | Target build platforms. Default: `linux/amd64,linux/arm64`<br>Example: `linux/arm64`                                                                                                                                                                       |
 | `extra_build_tag`     | no       | Use this custom tag **in addition** to auto-generated tags.<br>Useful with `workflow_dispatch` to override static tags like `dev`, `test`, or `unstable`. Example: `${{ github.event_name == 'workflow_dispatch' && github.event.inputs.my_tag \|\| '' }}` |
 | `build_args`          | no       | Multiline list of build arguments to pass to Docker build (`ARG`). Format: `KEY=value` per line. Example:<br>`build_args: \|`<br>&nbsp;&nbsp;&nbsp;&nbsp;`FOO=bar`<br>&nbsp;&nbsp;&nbsp;&nbsp;`BAZ=zoo`                                                    |
+| `context`             | no       | Use the supplied `context` to the docker build command; defaults to `.` i.e. root directory of the repository.<br>Read more on it here [Docker build context](https://docs.docker.com/build/concepts/context) |
 
 ## Secrets
 
