@@ -613,7 +613,7 @@ jobs:
 
       # Ensure context is valid (Dockerfile exists in path)
       - if: inputs.mode == 'BUILD'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: "Validate context Dockerfile"
         if: inputs.mode == 'BUILD'
         env:
