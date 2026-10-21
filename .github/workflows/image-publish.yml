@@ -705,7 +705,7 @@ jobs:
           images: ${{ inputs.image_registry }}/${{ inputs.image_namespace }}/${{ inputs.image_name }}
 
       # BUILD STEPS
-      - if: inputs.free_disk_space == 'true'
+      - if: ${{ inputs.free_disk_space == 'true' }}
         uses: jlumbroso/free-disk-space@main
         with:
           docker-images: false
